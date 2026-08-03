@@ -128,6 +128,23 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--text)}
 .todo-del{flex:0 0 auto;width:26px;height:26px;color:var(--muted);font-size:19px;line-height:1;border-radius:8px;opacity:.5}
 .todo-del:active{opacity:1;background:var(--surface-2)}
 .todo-sep{font-size:11px;color:var(--muted);padding:12px 2px 2px;margin-top:6px;border-top:1px dashed var(--line)}
+/* ===== 待办区域（首页：当日考勤 / 作业打卡 完成度） ===== */
+.todo-board{margin-bottom:12px}
+.tbrd{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tb-item{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:12px 13px}
+.tb-top{display:flex;align-items:baseline;gap:9px}
+.tb-num{font-size:30px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.tb-num.warn{color:var(--danger)}
+.tb-num.ok{color:#16a34a}
+.tb-cap{font-size:12.5px;color:var(--muted);font-weight:600}
+.tb-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.tb-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:#fff;border:1px solid var(--line);font-size:12.5px;cursor:pointer;color:var(--text);transition:transform .12s,border-color .12s,box-shadow .12s}
+.tb-chip:hover{transform:translateY(-1px);border-color:var(--danger);box-shadow:0 4px 14px rgba(220,38,38,.12)}
+.tb-chip .bang{flex:0 0 auto;width:16px;height:16px;border-radius:50%;background:var(--danger);color:#fff;font-size:11px;font-weight:900;line-height:16px;text-align:center}
+.tb-done{font-size:13px;color:#16a34a;font-weight:600;margin-top:9px;display:inline-block}
+.tb-reserved{grid-column:1/-1;display:flex;align-items:center;gap:10px;background:var(--surface-2);border:1px dashed var(--line);border-radius:14px;padding:11px 13px}
+.tb-res{font-size:12.5px;color:var(--muted)}
+@media(max-width:640px){.tbrd{grid-template-columns:1fr}}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:14px;font-weight:700;padding:10px 16px;border-radius:12px;background:var(--brand);color:#fff;transition:transform .12s,filter .12s}
 .btn:active{transform:scale(.96);filter:brightness(.95)}
 .btn.ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--line)}
@@ -1118,7 +1135,7 @@ const BOTTOM=[
 const TITLES={home:'教师教学工作台',exams:'成绩记录',attendance:'作业打卡',kaoqin:'考勤管理',
   feedback:'上课反馈',remark:'学情评语',classmanage:'班级管理',students:'学生管理',
   archive:'档案 & 数据导入',points:'积分奖惩',ai:'AI文案生成',knowledge:'知识详情',schedule:'日程安排'};
-const APP_VER='v58 · 2026-08-03';
+const APP_VER='v59 · 2026-08-03';
 function renderSidebar(){
   const badgeOf=id=>id==='kaoqin'?kqUnmarkedPast():0;
   $('#sidebar').innerHTML=NAV.map((g,gi)=>`<div class="nav-title">${g.group}</div>`+
@@ -1226,6 +1243,43 @@ function todoSection(){
         ${done.length?`<div class="todo-sep">已完成 ${done.length} 项</div>${done.map(row).join('')}`:''}
       </div>`:'<div class="empty" style="margin-top:12px">还没有待办事项<br><span style="font-size:12px">在上面输入框写一条，回车即可添加</span></div>'}
     </div>`;
+}
+// ---------- 待办区域：当日考勤 / 作业打卡 完成度（实时联动课程安排、考勤、打卡） ----------
+function isSchoolDay(c,date){
+  if(!c)return false;
+  if((!c.startDate||date<c.startDate)||(c.endDate&&date>c.endDate))return false;
+  return classDays(c,date,date).length>0;
+}
+// 当日未完成考勤的班级：今天有课，但考勤尚未「确定」
+function pendingAttClasses(today){
+  if(!state.classes||!state.classes.length)return [];
+  return state.classes.filter(c=>isSchoolDay(c,today)&&!(state.kqLocked&&state.kqLocked[kqKey(c.id,today)]));
+}
+// 当日未完成作业打卡的班级：今天有课，但作业登记尚未「确定」
+function pendingHwClasses(today){
+  if(!state.classes||!state.classes.length)return [];
+  return state.classes.filter(c=>isSchoolDay(c,today)&&!(state.attLocked&&state.attLocked[attLockKey(c.id,today)]));
+}
+function attGoto(clsId,date){state.curClassId=clsId;state.attDate=date;save();navigate('attendance');}
+function todoBoard(){
+  const today=todayStr();
+  const pa=pendingAttClasses(today), ph=pendingHwClasses(today);
+  const attChip=pa.length?pa.map(c=>`<button class="tb-chip" onclick="kqGoto('${c.id}','${today}')"><span class="bang">!</span>${esc(c.name)}</button>`).join(''):'<span class="tb-done">✅ 今日考勤已全部完成</span>';
+  const hwChip=ph.length?ph.map(c=>`<button class="tb-chip" onclick="attGoto('${c.id}','${today}')"><span class="bang">!</span>${esc(c.name)}</button>`).join(''):'<span class="tb-done">✅ 今日作业打卡已全部完成</span>';
+  return `<div class="card todo-board">
+    <div class="section-head" style="margin:0 0 10px"><h2>🔔 今日待办提醒</h2><span class="tag" style="background:var(--brand);color:#fff">实时</span></div>
+    <div class="tbrd">
+      <div class="tb-item">
+        <div class="tb-top"><span class="tb-num ${pa.length?'warn':'ok'}">${pa.length}</span><span class="tb-cap">事项1 · 当日待考勤班级</span></div>
+        <div class="tb-chips">${attChip}</div>
+      </div>
+      <div class="tb-item">
+        <div class="tb-top"><span class="tb-num ${ph.length?'warn':'ok'}">${ph.length}</span><span class="tb-cap">事项2 · 当日待作业打卡班级</span></div>
+        <div class="tb-chips">${hwChip}</div>
+      </div>
+      <div class="tb-reserved"><span class="tb-cap">事项3</span><span class="tb-res">预留位 · 后续可添加其他待办提醒</span></div>
+    </div>
+  </div>`;
 }
 function viewSchedule(){
   if(!state.schedSelDate)state.schedSelDate=todayStr();
@@ -1364,6 +1418,7 @@ function viewHome(){
   const links=[['knowledge','📖','知识详情'],['exams','✏️','成绩记录'],['attendance','📚','作业打卡'],['kaoqin','📋','考勤管理'],['feedback','📝','上课反馈'],
     ['classmanage','🏫','班级管理'],['students','🧑‍🎓','学生管理'],['points','🏅','积分奖惩'],['ai','✨','AI文案']];
   return `<div class="grid c3" style="margin-bottom:12px">${tiles.map(t=>`<div class="kpi"><div class="ico">${t[0]}</div><div class="v">${t[1]}</div><div class="l">${t[2]}</div></div>`).join('')}</div>
+  ${todoBoard()}
   <div class="home-rank" style="margin-bottom:14px">
     <div class="card"><div style="font-weight:700;margin-bottom:8px">本周积分排行 · TOP3</div>
       ${top3.map((s,i)=>`<div class="list-item" style="margin:0 0 8px"><span class="tag" style="${i<3?'background:var(--gold);color:#3a2c00':''}">${i+1}</span>
