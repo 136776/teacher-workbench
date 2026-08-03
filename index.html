@@ -1105,7 +1105,7 @@ const BOTTOM=[
 const TITLES={home:'教师教学工作台',exams:'成绩记录',attendance:'作业打卡',kaoqin:'考勤管理',
   feedback:'上课反馈',remark:'学情评语',classmanage:'班级管理',students:'学生管理',
   archive:'档案 & 数据导入',points:'积分奖惩',ai:'AI文案生成',knowledge:'知识详情',schedule:'日程安排'};
-const APP_VER='v53 · 2026-08-03';
+const APP_VER='v54 · 2026-08-03';
 function renderSidebar(){
   const badgeOf=id=>id==='kaoqin'?kqUnmarkedPast():0;
   $('#sidebar').innerHTML=NAV.map((g,gi)=>`<div class="nav-title">${g.group}</div>`+
@@ -2122,25 +2122,11 @@ function viewAttendance(){
     `${stats.length} 人 · 应交 ${sumTotal} · 已交 ${sumDone} · 未交 ${sumMiss}${stats.length?` · 提交率 ${sumRate}%`:''}`,
     submitBody,
     `<button class="btn sm" onclick="exportHwMonth()">导出 Excel</button>`);
-  // BT-4 汇总所有班级打卡率（跟随作业打卡页月份 state.attMonth）—— 表格展示，不再一条条罗列
+  // BT-4 汇总所有班级打卡率（跟随作业打卡页月份 state.attMonth）—— 使用通用统计表格模板
   const agg=allClassHwMonthAgg();
-  const aggTable=`<div style="overflow:auto;-webkit-overflow-scrolling:touch"><table style="border-collapse:collapse;width:100%;min-width:340px;font-size:13px">
-    <thead><tr>
-      <th style="text-align:left;padding:8px 10px;border:1px solid var(--line);border-bottom:2px solid var(--line);color:var(--muted);font-weight:700">班级</th>
-      <th style="text-align:center;padding:8px 10px;border:1px solid var(--line);border-bottom:2px solid var(--line);color:var(--muted);font-weight:700">应提交</th>
-      <th style="text-align:center;padding:8px 10px;border:1px solid var(--line);border-bottom:2px solid var(--line);color:var(--muted);font-weight:700">已交</th>
-      <th style="text-align:center;padding:8px 10px;border:1px solid var(--line);border-bottom:2px solid var(--line);color:var(--muted);font-weight:700">出勤率</th>
-    </tr></thead>
-    <tbody>
-      ${agg.rows.length?agg.rows.map(r=>`<tr>
-        <td style="font-weight:600;padding:8px 10px;border:1px solid var(--line)">${esc(r.cls.name)}</td>
-        <td style="text-align:center;padding:8px 10px;border:1px solid var(--line)">${r.expected}</td>
-        <td style="text-align:center;padding:8px 10px;border:1px solid var(--line);color:var(--ok);font-weight:600">${r.done}</td>
-        <td style="text-align:center;padding:8px 10px;border:1px solid var(--line);font-weight:700;color:${r.rate==null?'var(--muted)':r.rate>=80?'var(--ok)':r.rate>=60?'var(--gold)':'var(--danger)'}">${r.rate==null?'—':r.rate+'%'}</td>
-      </tr>`).join(''):`<tr><td colspan="4" style="text-align:center;padding:14px;color:var(--muted)">本月还没有班级设置上课星期</td></tr>`}
-      ${agg.rows.length?`<tr style="background:var(--surface-2)"><td style="font-weight:700;padding:8px 10px;border:1px solid var(--line)">全部班级汇总</td><td style="text-align:center;padding:8px 10px;border:1px solid var(--line);font-weight:700">${agg.totalExpected}</td><td style="text-align:center;padding:8px 10px;border:1px solid var(--line);font-weight:700;color:var(--ok)">${agg.totalDone}</td><td style="text-align:center;padding:8px 10px;border:1px solid var(--line);font-weight:700">${agg.totalRate}%</td></tr>`:''}
-    </tbody>
-  </table></div>`;
+  const aggRows=agg.rows.map(r=>({name:r.cls.name,expected:r.expected,done:r.done,rate:r.rate}));
+  const aggTotal=agg.rows.length?{name:'全部班级汇总',expected:agg.totalExpected,done:agg.totalDone,rate:agg.totalRate}:null;
+  const aggTable=rateTable(['班级','应提交','已交','出勤率'],aggRows,aggTotal,{empty:'本月还没有班级设置上课星期'});
   const aggCard=statCard(`${state.attMonth+1}月 · 全部班级打卡率`,
     agg.rows.length?`${agg.rows.length} 个班 · 应交 ${agg.totalExpected} · 已交 ${agg.totalDone} · 出勤率 ${agg.totalRate}%`:'暂无数据',
     aggTable,
@@ -2158,13 +2144,14 @@ function viewAttendance(){
     miss.length?`${miss.length} 个班 · 共 ${missTotal} 人次未交 · 点班级看明细`:'全部交齐 🎉',
     missBody,
     `<button class="btn sm" onclick="exportMissHw()">导出表格</button>`);
-  // 累计作业打卡（开课至结课）
+  // 累计作业打卡（开课至结课）—— 使用通用统计表格模板
   const tOk=cfgOk&&totalStats.length;
   const tTotal=totalStats.reduce((a,b)=>a+b.total,0);
   const tDone=totalStats.reduce((a,b)=>a+b.done,0);
   const tRate=tTotal?Math.round(tDone/tTotal*100):0;
-  const totalBody=`<div class="fold-scroll">${tOk?totalStats.map(x=>srow(x.s.name,x.done,x.total,x.rate)).join(''):'<div class="empty">设置「开课起始日期 + 每周上课星期」后，自动统计累计应交次数</div>'}</div>`
-    +(tOk?srow('全期合计',tDone,tTotal,tRate,true):'');
+  const totalRows=tOk?totalStats.map(x=>({name:x.s.name,expected:x.total,done:x.done,rate:x.rate})):[];
+  const totalTotal=tOk?{name:'全期合计',expected:tTotal,done:tDone,rate:tRate}:null;
+  const totalBody=rateTable(['学生','应交','已交','累计率'],totalRows,totalTotal,{empty:'设置「开课起始日期 + 每周上课星期」后，自动统计累计应交次数'});
   const totalCard=statCard('累计作业打卡（开课至结课）',
     tOk?`${totalStats.length} 人 · 应交 ${tTotal} · 已交 ${tDone} · 未交 ${tTotal-tDone} · 累计率 ${tRate}%`:'未设置开课安排',
     totalBody,
@@ -2218,6 +2205,27 @@ function foldBlock(k,ico,title,sub,val,body,tools){
 function statCard(title,sub,body,tools){
   return `<div class="section-head" style="margin-top:22px"><h2>${title}</h2>${sub?`<span class="tag">${sub}</span>`:''}${tools?`<span style="margin-left:auto">${tools}</span>`:''}</div>
   <div class="card" style="padding:12px">${body}</div>`;
+}
+/* 通用统计表格模板：名称 / 应提交 / 已交 / 出勤率（累计作业打卡、全部班级打卡率 共用此模板）
+   rows: [{name,expected,done,rate}]；total: {name,expected,done,rate} 或 null */
+function rateTable(headers, rows, total, opts){
+  opts=opts||{};
+  const rc=r=>(r.rate==null||r.rate==='—')?'var(--muted)':(r.rate>=80?'var(--ok)':r.rate>=60?'var(--gold)':'var(--danger)');
+  const cell=(v,extra)=>`<td style="text-align:center;padding:8px 10px;border:1px solid var(--line)${extra?';'+extra:''}">${v}</td>`;
+  const tr=r=>`<tr>
+    <td style="font-weight:600;padding:8px 10px;border:1px solid var(--line)">${esc(r.name)}</td>
+    ${cell(r.expected)}
+    ${cell(r.done,'color:var(--ok);font-weight:600')}
+    ${cell(r.rate==null?'—':r.rate+'%','color:'+rc(r)+';font-weight:700')}
+  </tr>`;
+  const th=headers.map((h,i)=>`<th style="text-align:${i===0?'left':'center'};padding:8px 10px;border:1px solid var(--line);border-bottom:2px solid var(--line);color:var(--muted);font-weight:700">${h}</th>`).join('');
+  return `<div style="overflow:auto;-webkit-overflow-scrolling:touch"><table style="border-collapse:collapse;width:100%;min-width:340px;font-size:13px">
+    <thead><tr>${th}</tr></thead>
+    <tbody>
+      ${rows.length?rows.map(tr).join(''):`<tr><td colspan="${headers.length}" style="text-align:center;padding:14px;color:var(--muted)">${opts.empty||'暂无数据'}</td></tr>`}
+      ${total?`<tr style="background:var(--surface-2)"><td style="font-weight:700;padding:8px 10px;border:1px solid var(--line)">${esc(total.name)}</td>${cell(total.expected)}${cell(total.done,'color:var(--ok);font-weight:600')}${cell(total.rate+'%','font-weight:700')}</tr>`:''}
+    </tbody>
+  </table></div>`;
 }
 /* 紧凑统计行：姓名 · 已交/应交 · 进度条 · 百分比 */
 function srow(name,done,total,rate,isTotal){
@@ -2444,10 +2452,14 @@ function kqWindowDays(cls){
   if(cls.endDate&&cls.endDate<mTo)mTo=cls.endDate;
   return classDays(cls,mFrom,mTo);
 }
+/* 应到课时 = 截至今日「已排课总人次」= 已过去的排课日数 × 班级人数（不含未来排课日） */
+function kqExpectedSlots(cls,days){const t=todayStr();return days.filter(d=>d<=t).length*cls.students.length;}
 function kqAggWin(cls,days){
   let present=0,absent=0;const reasons={};
   days.forEach(d=>{const m=state.attendance[kqKey(cls.id,d)];if(!m)return;cls.students.forEach(id=>{const r=m[id];if(r&&r.status==='present')present++;else if(r&&r.status==='absent'){absent++;const rs=r.reason||'未填';reasons[rs]=(reasons[rs]||0)+1;}});});
-  return {present,absent,reasons,days:days.length};
+  const expected=kqExpectedSlots(cls,days);
+  const rate=expected?Math.round(present/expected*100):0;
+  return {present,absent,expected,reasons,days:days.length,rate};
 }
 function kqMonthDays(c){
   const y=new Date().getFullYear(),m=state.kqMonth,mm=String(m+1).padStart(2,'0');
@@ -2457,11 +2469,10 @@ function kqMonthDays(c){
   return classDays(c,mFrom,mTo);
 }
 function kqAggAllMonth(){
-  let present=0,absent=0;
-  state.classes.forEach(c=>{const a=kqAggWin(c,kqMonthDays(c));present+=a.present;absent+=a.absent;});
-  const total=present+absent;
-  const rate=total?Math.round(present/total*100):0;
-  return {present,absent,total,rate};
+  let present=0,absent=0,expected=0;
+  state.classes.forEach(c=>{const a=kqAggWin(c,kqMonthDays(c));present+=a.present;absent+=a.absent;expected+=a.expected;});
+  const rate=expected?Math.round(present/expected*100):0;
+  return {present,absent,expected,total:expected,rate};
 }
 function kqStuDetailWin(cls,days){
   const set=new Set(days);
@@ -2511,7 +2522,7 @@ function viewKaoqin(){
   const wAgg=kqAggWin(cls,wDays);
   const allK=kqAggAllMonth();
   const winLabel={month:(state.kqMonth+1)+'月',all:'全部'}[state.kqRange||'month'];
-  const rate=wAgg.present+wAgg.absent?Math.round(wAgg.present/(wAgg.present+wAgg.absent)*100):0;
+  const rate=wAgg.rate;
   const dayAbsent=cls.students.map(id=>kqRec(cls.id,state.kqDate,id)).map((r,i)=>({r,n:cls.students[i]})).filter(x=>x.r&&x.r.status==='absent');
   const reasonList=Object.keys(ds.reasons).length?Object.entries(ds.reasons).map(([r,n])=>`<div class="list-item" style="margin:0 0 6px"><span style="font-weight:600">${esc(r)}</span><span class="tag danger" style="margin-left:auto">${n} 人</span></div>`).join(''):'<div class="empty">当天无缺勤</div>';
   const dayAbsentTxt=dayAbsent.length?dayAbsent.map(x=>`${esc(x.n.name)}（${esc(x.r.reason)}）`).join('、'):'— 全部到课 —';
@@ -2594,9 +2605,9 @@ function viewKaoqin(){
     <div class="section-head" style="margin-top:22px"><h2>${state.kqMonth+1}月 · 全部班级课时</h2>
       <div class="row" style="gap:4px"><button class="icon-btn" onclick="state.kqRange='month';kqPrevMonth()">‹</button><button class="icon-btn" onclick="state.kqRange='month';kqNextMonth()">›</button><span class="tag">汇总所有班</span></div></div>
     <div class="card" style="margin-bottom:12px">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">本月您名下全部班级的课时合计（应到 = 已排课总人次；缺课课时即缺到的人次数）</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">本月您名下全部班级的课时合计（应到 = 截至今日已排课总人次 = 已过去的排课日数 × 人数；缺课课时即缺到的人次数）</div>
       <div class="grid c4">
-        <div class="kpi"><div class="v">${allK.total}</div><div class="l">应到课时</div></div>
+        <div class="kpi"><div class="v">${allK.expected}</div><div class="l">应到课时</div></div>
         <div class="kpi"><div class="v" style="color:#16a34a">${allK.present}</div><div class="l">实到课时</div></div>
         <div class="kpi"><div class="v" style="color:#dc2626">${allK.absent}</div><div class="l">缺课课时</div></div>
         <div class="kpi"><div class="v">${allK.rate}%</div><div class="l">课时出勤率</div></div>
@@ -2607,7 +2618,7 @@ function viewKaoqin(){
       ${[['month','本月'],['all','全部']].map(o=>`<button class="cat-tab ${state.kqRange===o[0]?'on':''}" onclick="state.kqRange='${o[0]}';save();render()">${o[1]}</button>`).join('')}
     </div>
     <div class="grid c4" style="margin-bottom:12px">
-      <div class="kpi"><div class="v">${wAgg.present+wAgg.absent}</div><div class="l">应到课时</div></div>
+      <div class="kpi"><div class="v">${wAgg.expected}</div><div class="l">应到课时</div></div>
       <div class="kpi"><div class="v" style="color:#16a34a">${wAgg.present}</div><div class="l">实到课时</div></div>
       <div class="kpi"><div class="v" style="color:#dc2626">${wAgg.absent}</div><div class="l">缺课课时</div></div>
       <div class="kpi"><div class="v">${rate}%</div><div class="l">课时出勤率</div></div>
@@ -3049,21 +3060,43 @@ function downloadXLSX(){loadSheetJS(()=>{try{
   XLSX.writeFile(wb,'学生导入模板.xlsx');toast('Excel模板已下载');}catch(e){toast('生成失败，已改用CSV');downloadTemplate();}});}
 function exportSheet(filename,rows){loadSheetJS(()=>{try{const ws=XLSX.utils.aoa_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Sheet1');XLSX.writeFile(wb,filename);toast('已导出 '+filename);}catch(e){toast('导出失败');}});}
 function exportClass(){const cls=curClass();const rows=[['姓名','手机号','分数','剩余课时','薄弱知识点','积分','出勤']];cls.students.forEach(id=>{const s=stuOf(id);rows.push([s.name,s.phone,s.score,s.lessons,s.weak.map(w=>w.label).join('、'),s.points,s.attLogs.length]);});const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');const b=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=cls.name+'-备份.csv';a.click();toast('已导出本班备份');}
-// ---------- 积分奖惩 ----------
+// ---------- 积分奖惩（按班级分类，点班级看每人排名）----------
 function viewPoints(){
-  const cls=curClass();
-  const ranking=clsStudents(cls).sort((a,b)=>b.points-a.points).slice(0,10);
-  return `<div class="section-head"><h2>积分奖惩</h2><button class="btn sm" onclick="batchPoints()">批量登记</button></div>
-  <div class="card"><div style="font-weight:700;margin-bottom:8px">班级积分排行 · ${esc(cls.name)}</div>
-    ${ranking.map((s,i)=>`<div class="list-item" style="margin:0 0 8px"><span class="tag ${i<3?'':''}" style="${i<3?'background:var(--gold);color:#3a2c00':''}">${i+1}</span>
-      <div class="avatar av${(cls.students.indexOf(s.id)%6)+1}" style="width:34px;height:34px;font-size:14px">${esc((s.name||"?")[0])}</div>
-      <span style="font-weight:600">${esc(s.name)}</span><b style="margin-left:auto;color:var(--brand)">${s.points}</b></div>`).join('')||'<div class="empty">暂无</div>'}
-  </div>
-  <div class="card"><div style="font-weight:700;margin-bottom:6px">积分规则库（可点选）</div>
+  const classCards=state.classes.map(c=>{
+    const st=clsStudents(c);
+    const top=(st.length?st.slice().sort((a,b)=>b.points-a.points)[0]:null);
+    const avg=st.length?Math.round(st.reduce((a,s)=>a+s.points,0)/st.length):0;
+    return `<div class="class-card hoverable" onclick="pointsDrill('${c.id}')" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="flex:1;min-width:0"><div style="font-weight:700">${esc(c.name)}</div><div style="font-size:12px;color:var(--muted)">${st.length} 人 · 当前最高 ${top?top.points:0} 分 · 平均 ${avg} 分</div></div>
+      <div class="ab-chev">›</div>
+    </div>`;
+  }).join('');
+  return `<div class="section-head"><h2>积分奖惩</h2></div>
+  <div style="font-size:13px;color:var(--muted);margin:0 0 8px">按班级查看积分排名，点班级进入查看每个人的积分与名次。</div>
+  <div class="card" style="padding:12px">${classCards||'<div class="empty">暂无班级</div>'}</div>
+  <div class="card" style="margin-top:12px"><div style="font-weight:700;margin-bottom:6px">积分规则库（可点选）</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:6px">✨ 加分项</div><div class="plib">${POINT_LIB.add.flatMap(g=>g.items).map(([n,p])=>`<span class="chip add" style="color:var(--ok)">+${p} ${esc(n)}</span>`).join('')}</div>
     <div style="font-size:12px;color:var(--muted);margin:10px 0 6px">⚠️ 扣分项</div><div class="plib">${POINT_LIB.sub.flatMap(g=>g.items).map(([n,p])=>`<span class="chip sub" style="color:var(--danger)">${p} ${esc(n)}</span>`).join('')}</div>
   </div>
-  <div class="card"><div style="font-weight:700;margin-bottom:6px">操作入口</div><p style="font-size:13px;color:var(--text-2)">点开任意学生档案 → 积分编辑，按规则库一键登记，每笔带日期与备注，流水永久保存。</p><button class="btn ghost sm" onclick="navigate('students')">去学生管理 →</button></div>`;
+  <div class="card" style="margin-top:12px"><div style="font-weight:700;margin-bottom:6px">操作入口</div><p style="font-size:13px;color:var(--text-2)">点开任意学生档案 → 积分编辑，按规则库一键登记，每笔带日期与备注，流水永久保存。</p><button class="btn ghost sm" onclick="navigate('students')">去学生管理 →</button></div>`;
+}
+/* 点击班级 → 弹窗展示该班每个人的积分排名 */
+function pointsDrill(clsId){
+  const c=state.classes.find(x=>x.id===clsId);if(!c){toast('该班级已不存在');return;}
+  const list=clsStudents(c).slice().sort((a,b)=>b.points-a.points);
+  const avg=list.length?Math.round(list.reduce((a,s)=>a+s.points,0)/list.length):0;
+  const medal=i=>i===0?'background:var(--gold);color:#3a2c00':i===1?'background:#e6e8ea;color:#333':i===2?'background:#e9c9a8;color:#5a3a12':'';
+  const body=list.length?list.map((s,i)=>`<div class="list-item" style="margin:0 0 6px;align-items:center">
+    <span class="tag" style="${medal(i)};min-width:26px;text-align:center">${i+1}</span>
+    <div class="avatar av${(c.students.indexOf(s.id)%6)+1}" style="width:32px;height:32px;font-size:13px">${esc((s.name||'?')[0])}</div>
+    <span style="font-weight:600;flex:1;min-width:0">${esc(s.name)}</span>
+    <b style="color:var(--brand);margin-right:8px">${s.points} 分</b>
+    <button class="btn ghost sm" onclick="openPointsEditor('${s.id}')">积分</button>
+  </div>`).join(''):'<div class="empty">本班暂无学生</div>';
+  openModal(`<h3>${esc(c.name)} · 积分排名</h3>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">共 ${list.length} 人 · 班级平均 ${avg} 分</div>
+    <div style="max-height:60vh;overflow:auto;margin:0 -4px;padding:0 4px">${body}</div>
+    <div class="row" style="margin-top:12px;gap:8px"><button class="btn" style="flex:1" onclick="closeModal();batchPoints('${c.id}')">批量登记积分</button><button class="btn ghost" style="flex:1" onclick="closeModal()">关闭</button></div>`);
 }
 function openPointsEditor(id){state._peId=id;renderPointsEditor();}
 function renderPointsEditor(){
@@ -3087,7 +3120,7 @@ function openEditPoint(id,idx){const s=stuOf(id);const l=s.pointLogs[idx];openMo
 function saveEditPoint(id,idx){const s=stuOf(id);const l=s.pointLogs[idx];if(!l){closeModal();return;}l.pts=+$('#epPts').value||0;l.note=$('#epNote').value.trim()||'自定义';recalcPoints(s);save();forceCloseModal();renderPointsEditor();renderStudents();refreshStuDetail(id);toast('已更新积分记录');}
 function deletePointLog(id,idx){const note=state.students[id]&&state.students[id].pointLogs[idx]?state.students[id].pointLogs[idx].note:'';openModal(`<h3>删除积分记录</h3><p style="font-size:13px;line-height:1.6">确认删除这条积分记录（${esc(note)}）？删除后总积分自动重算。</p><div class="row" style="gap:8px;margin-top:12px"><button class="btn ghost" style="flex:1" onclick="closeModal()">取消</button><button class="btn" style="flex:1;background:var(--danger);color:#fff" onclick="doDeletePoint('${id}',${idx})">确认删除</button></div>`);}
 function doDeletePoint(id,idx){const s=state.students[id];if(!s||!s.pointLogs[idx]){closeModal();return;}s.pointLogs.splice(idx,1);recalcPoints(s);save();forceCloseModal();renderPointsEditor();renderStudents();refreshStuDetail(id);toast('已删除该记录');}
-function batchPoints(){const cls=curClass();openModal(`<h3>批量登记积分</h3>
+function batchPoints(clsId){const cls=(clsId&&state.classes.find(c=>c.id===clsId))||curClass();openModal(`<h3>批量登记积分</h3>
    <div class="field"><label>选择规则</label><select class="input" id="br">${POINT_LIB.add.concat(POINT_LIB.sub).flatMap(g=>g.items).map(([n,p])=>`<option value="${p}">${esc(n)} (${p>=0?'+':''}${p})</option>`).join('')}</select></div>
    <div class="field"><label>勾选学生</label><div style="max-height:220px;overflow:auto">${cls.students.map(id=>{const s=stuOf(id);return `<label class="list-item" style="margin:0 0 8px;cursor:pointer"><input type="checkbox" class="chk" value="${id}"> <span>${esc(s.name)}</span></label>`;}).join('')}</div></div>
    <button class="btn" style="width:100%" onclick="applyBatch()">应用到选中</button>`);}
