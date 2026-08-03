@@ -47,8 +47,10 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--text)}
 }
 .topbar .menu-btn{font-size:22px;width:38px;height:38px;border-radius:12px;display:grid;place-items:center}
 .topbar .menu-btn:active{background:var(--surface-3)}
-.back-btn{font-size:15px;font-weight:700;height:38px;width:auto;padding:0 12px;border-radius:12px;display:none;place-items:center;color:var(--text-2);flex-shrink:0}
+.back-btn{font-size:14px;font-weight:700;height:38px;min-width:44px;padding:0 12px;border-radius:12px;display:none;place-items:center;color:var(--text-2);background:var(--surface-2);border:1px solid var(--line);flex-shrink:0;transition:transform .12s ease,background .2s ease}
 .back-btn.show{display:grid}
+.back-btn.home{color:#fff;background:var(--brand);border-color:var(--brand)}
+.back-btn:active{transform:scale(.95)}
 .back-btn:disabled{opacity:.28;cursor:not-allowed}
 .topbar h1{font-size:17px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pill{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line)}
@@ -1096,7 +1098,7 @@ const BOTTOM=[
 const TITLES={home:'教师教学工作台',exams:'成绩记录',attendance:'作业打卡',kaoqin:'考勤管理',
   feedback:'上课反馈',remark:'学情评语',classmanage:'班级管理',students:'学生管理',
   archive:'档案 & 数据导入',points:'积分奖惩',ai:'AI文案生成',knowledge:'知识详情',schedule:'日程安排'};
-const APP_VER='v51 · 2026-08-03';
+const APP_VER='v52 · 2026-08-03';
 function renderSidebar(){
   const badgeOf=id=>id==='kaoqin'?kqUnmarkedPast():0;
   $('#sidebar').innerHTML=NAV.map((g,gi)=>`<div class="nav-title">${g.group}</div>`+
@@ -1306,7 +1308,12 @@ function render(){
   $('#themeBtn').textContent=state.theme==='light'?'深色':'浅色';
   renderSync();renderSidebar();renderBottom();
   $('#pageTitle').textContent=TITLES[state.currentPage]||'工作台';
-  const bb=$('#backBtn');const canBack=canGoBack();bb.disabled=!canBack;bb.classList.add('show');bb.textContent=state.stack.length?'← 返回':'‹';
+  const bb=$('#backBtn');const canBack=canGoBack();
+  bb.disabled=!canBack;
+  bb.classList.toggle('show',canBack);
+  const inFlow=!!state.stack.length;
+  bb.textContent=inFlow?'← 返回':'🏠 首页';
+  bb.classList.toggle('home',!inFlow&&state.currentPage!=='home');
   const m=$('#main');
   const pageChanged=(state.currentPage!==lastRenderedPage);
   const prevScroll=pageChanged?0:m.scrollTop;
@@ -2108,13 +2115,28 @@ function viewAttendance(){
     `${stats.length} 人 · 应交 ${sumTotal} · 已交 ${sumDone} · 未交 ${sumMiss}${stats.length?` · 提交率 ${sumRate}%`:''}`,
     submitBody,
     `<button class="btn sm" onclick="exportHwMonth()">导出 Excel</button>`);
-  // BT-4 汇总所有班级打卡率（跟随作业打卡页月份 state.attMonth）
+  // BT-4 汇总所有班级打卡率（跟随作业打卡页月份 state.attMonth）—— 表格展示，不再一条条罗列
   const agg=allClassHwMonthAgg();
-  const aggBody=`<div class="fold-scroll">${agg.rows.length?agg.rows.map(r=>srow(r.cls.name,r.done,r.expected,r.rate)).join(''):'<div class="empty">本月还没有班级设置上课星期</div>'}</div>`
-    +(agg.rows.length?srow('全部班级汇总',agg.totalDone,agg.totalExpected,agg.totalRate,true):'');
+  const aggTable=`<div style="overflow:auto;-webkit-overflow-scrolling:touch"><table style="border-collapse:collapse;width:100%;min-width:340px;font-size:13px">
+    <thead><tr>
+      <th style="text-align:left;padding:8px 10px;border:1px solid var(--line);border-bottom:2px solid var(--line);color:var(--muted);font-weight:700">班级</th>
+      <th style="text-align:center;padding:8px 10px;border:1px solid var(--line);border-bottom:2px solid var(--line);color:var(--muted);font-weight:700">应提交</th>
+      <th style="text-align:center;padding:8px 10px;border:1px solid var(--line);border-bottom:2px solid var(--line);color:var(--muted);font-weight:700">已交</th>
+      <th style="text-align:center;padding:8px 10px;border:1px solid var(--line);border-bottom:2px solid var(--line);color:var(--muted);font-weight:700">出勤率</th>
+    </tr></thead>
+    <tbody>
+      ${agg.rows.length?agg.rows.map(r=>`<tr>
+        <td style="font-weight:600;padding:8px 10px;border:1px solid var(--line)">${esc(r.cls.name)}</td>
+        <td style="text-align:center;padding:8px 10px;border:1px solid var(--line)">${r.expected}</td>
+        <td style="text-align:center;padding:8px 10px;border:1px solid var(--line);color:var(--ok);font-weight:600">${r.done}</td>
+        <td style="text-align:center;padding:8px 10px;border:1px solid var(--line);font-weight:700;color:${r.rate==null?'var(--muted)':r.rate>=80?'var(--ok)':r.rate>=60?'var(--gold)':'var(--danger)'}">${r.rate==null?'—':r.rate+'%'}</td>
+      </tr>`).join(''):`<tr><td colspan="4" style="text-align:center;padding:14px;color:var(--muted)">本月还没有班级设置上课星期</td></tr>`}
+      ${agg.rows.length?`<tr style="background:var(--surface-2)"><td style="font-weight:700;padding:8px 10px;border:1px solid var(--line)">全部班级汇总</td><td style="text-align:center;padding:8px 10px;border:1px solid var(--line);font-weight:700">${agg.totalExpected}</td><td style="text-align:center;padding:8px 10px;border:1px solid var(--line);font-weight:700;color:var(--ok)">${agg.totalDone}</td><td style="text-align:center;padding:8px 10px;border:1px solid var(--line);font-weight:700">${agg.totalRate}%</td></tr>`:''}
+    </tbody>
+  </table></div>`;
   const aggCard=statCard(`${state.attMonth+1}月 · 全部班级打卡率`,
     agg.rows.length?`${agg.rows.length} 个班 · 应交 ${agg.totalExpected} · 已交 ${agg.totalDone} · 出勤率 ${agg.totalRate}%`:'暂无数据',
-    aggBody,
+    aggTable,
     `<button class="btn sm" onclick="exportAllClassHwRate()">导出</button>`);
   // BT-5 未交作业名单（点班级 → 看具体谁哪天没交）
   const miss=missHwByClass();
@@ -2472,10 +2494,20 @@ function viewKaoqin(){
   const dayAbsent=cls.students.map(id=>kqRec(cls.id,state.kqDate,id)).map((r,i)=>({r,n:cls.students[i]})).filter(x=>x.r&&x.r.status==='absent');
   const reasonList=Object.keys(ds.reasons).length?Object.entries(ds.reasons).map(([r,n])=>`<div class="list-item" style="margin:0 0 6px"><span style="font-weight:600">${esc(r)}</span><span class="tag danger" style="margin-left:auto">${n} 人</span></div>`).join(''):'<div class="empty">当天无缺勤</div>';
   const dayAbsentTxt=dayAbsent.length?dayAbsent.map(x=>`${esc(x.n.name)}（${esc(x.r.reason)}）`).join('、'):'— 全部到课 —';
-  const det=kqStuDetailWin(cls,wDays).filter(x=>x.recs.length);
-  const detHtml=det.length?det.map(x=>`<div class="list-item" style="margin:0 0 6px;flex-wrap:wrap"><span style="font-weight:600">${esc(x.s.name)}</span><span class="tag danger" style="margin-left:6px">缺勤 ${x.recs.length} 次</span><span style="margin-left:auto;font-size:12px;color:var(--muted)">${x.recs.map(r=>kqMD(r.date)+'·'+esc(r.reason)).join('、')}</span></div>`).join(''):'<div class="empty">暂无缺勤记录</div>';
-  const leaveItems=[];cls.students.forEach(id=>{const recs=[];Object.keys(state.attendance).forEach(k=>{if(!k.startsWith(cls.id+'::'))return;const ds=k.split('::')[1];const r=state.attendance[k][id];if(r&&r.status==='absent')recs.push({date:ds,reason:r.reason||'未填'});});if(recs.length)leaveItems.push({s:state.students[id],recs});});
-  const leaveHtml=leaveItems.length?leaveItems.map(x=>`<div class="list-item" style="margin:0 0 6px;flex-wrap:wrap;align-items:flex-start"><b>${esc(x.s.name)}</b><span class="tag danger" style="margin-left:6px">${x.recs.length} 次请假</span><span style="margin-left:auto;font-size:12px;color:var(--muted);text-align:right">${x.recs.map(r=>kqMD(r.date)+'·'+esc(r.reason)).join('、')}</span></div>`).join(''):'<div class="empty">暂无请假记录</div>';
+  // 所有班级缺勤人员（跨班汇总，仿作业未交名单：按班分组 + 点开看明细 + 可导出）
+  const allAbs=allAbsentByClass();
+  const allAbsTotal=allAbs.reduce((a,g)=>a+g.rows.reduce((x,y)=>x+y.recs.length,0),0);
+  const allAbsPeople=allAbs.reduce((a,g)=>a+g.rows.length,0);
+  const allAbsBody=`<div class="fold-scroll">${allAbs.length?allAbs.map(g=>{const tm=g.rows.reduce((a,x)=>a+x.recs.length,0);return `<div class="miss-row" style="margin-bottom:6px;cursor:pointer" onclick="absDrill('${g.cls.id}')">
+      <div class="mr-badge">${tm}</div>
+      <div style="flex:1;min-width:0"><b>${esc(g.cls.name)}</b><span style="font-size:12px;color:var(--muted);margin-left:8px">${g.rows.length} 人缺勤</span>
+      <div class="miss-detail">${g.rows.slice(0,3).map(x=>esc(x.s.name)+'×'+x.recs.length).join('、')}${g.rows.length>3?' …':''}</div></div>
+      <div class="ab-chev">›</div>
+    </div>`;}).join(''):'<div class="empty">所有班级近期均无缺勤 🎉</div>'}</div>`;
+  const allAbsCard=statCard(`所有班级缺勤人员`,
+    allAbs.length?`${allAbs.length} 个班 · ${allAbsPeople} 人缺勤 · 共 ${allAbsTotal} 人次`:'全部到课 🎉',
+    allAbsBody,
+    `<button class="btn sm" onclick="exportAllAbsent()">导出表格</button>`);
   const kqAwardCard=`<div class="card" style="margin-bottom:12px"><div class="row" style="justify-content:space-between">
     <div><div style="font-weight:700">考勤积分联动</div><div style="font-size:12px;color:var(--muted)">到课 +2 · 事假/旷课 −2 · 病假 0（自动计入总积分）</div></div>
     <button class="switch ${state.settings.kqAward?'on':''}" onclick="state.settings.kqAward=!state.settings.kqAward;save();render()"></button>
@@ -2559,10 +2591,7 @@ function viewKaoqin(){
       <div class="kpi"><div class="v" style="color:#dc2626">${wAgg.absent}</div><div class="l">缺课课时</div></div>
       <div class="kpi"><div class="v">${rate}%</div><div class="l">课时出勤率</div></div>
     </div>
-    <div class="section-head" style="margin-top:22px"><h2>请假名单</h2><button class="btn sm" onclick="exportKqLeave()">导出表格</button></div>
-    <div class="card">${leaveHtml}</div>
-    <div class="section-head" style="margin-top:22px"><h2>学生缺勤明细</h2><span class="tag">点开可看清每次请假</span></div>
-    <div class="card">${detHtml}</div>`+makeupSection+reportSection;
+    ${allAbsCard}`+makeupSection+reportSection;
 }
 function kqShiftStr(ds,n){const d=parseD(ds);d.setDate(d.getDate()+n);return fmtD(d);}
 function exportKqRoster(){
@@ -2576,14 +2605,41 @@ function exportKqRoster(){
   });
   exportSheet(`${cls.name}-考勤名单.xlsx`,rows);
 }
-/* 请假名单导出（全部班级 · 所有缺勤记录，含病假/事假/旷课） */
-function exportKqLeave(){
-  const rows=[['班级','学生姓名','请假日期','请假类型']];let n=0;
+/* 所有班级缺勤人员（跨班汇总，仿作业未交名单） */
+function allAbsentByClass(){
+  const out=[];
   state.classes.forEach(c=>{
-    Object.keys(state.attendance).forEach(k=>{if(!k.startsWith(c.id+'::'))return;const ds=k.split('::')[1];const m=state.attendance[k];c.students.forEach(id=>{const r=m[id];if(r&&r.status==='absent'){rows.push([c.name,stuName(id),kqMD(ds),r.reason||'未填']);n++;}});});
+    const rows=[];
+    clsStudents(c).forEach(s=>{
+      const recs=[];
+      Object.keys(state.attendance).forEach(k=>{
+        if(!k.startsWith(c.id+'::'))return;
+        const d=k.split('::')[1];const r=state.attendance[k][s.id];
+        if(r&&r.status==='absent')recs.push({date:d,reason:r.reason||'未填'});
+      });
+      if(recs.length)rows.push({s,recs});
+    });
+    if(rows.length)out.push({cls:c,rows});
   });
-  if(!n){toast('还没有请假记录');return;}
-  exportSheet('请假名单.xlsx',rows);
+  out.sort((a,b)=>b.rows.reduce((x,y)=>x+y.recs.length,0)-a.rows.reduce((x,y)=>x+y.recs.length,0));
+  return out;
+}
+/* 点击缺勤名单里的班级 → 弹窗看该班具体谁哪天缺勤（含病假/事假/旷课） */
+function absDrill(clsId){
+  const c=state.classes.find(x=>x.id===clsId);if(!c)return;
+  const g=allAbsentByClass().find(x=>x.cls.id===clsId);
+  const html=g?g.rows.map(x=>`<div class="list-item" style="margin:0 0 6px;flex-wrap:wrap;align-items:flex-start"><span style="font-weight:600">${esc(x.s.name)}</span><span class="tag danger" style="margin-left:6px">缺勤 ${x.recs.length} 次</span><span style="margin-left:auto;font-size:12px;color:var(--muted);text-align:right">${x.recs.map(r=>kqMD(r.date)+'·'+esc(r.reason)).join('、')}</span></div>`).join(''):'<div class="empty">该班暂无缺勤记录</div>';
+  openModal(`<h3>📋 ${esc(c.name)} · 缺勤人员</h3>
+    <div style="margin:10px 0 14px;display:flex;gap:8px"><button class="btn sm" onclick="exportAllAbsent()">⬇️ 导出全部</button><button class="btn ghost sm" onclick="forceCloseModal()">关闭</button></div>
+    ${html}`);
+}
+/* 导出：所有班级缺勤人员（含病假/事假/旷课） */
+function exportAllAbsent(){
+  const data=allAbsentByClass();
+  if(!data.length){toast('还没有缺勤记录');return;}
+  const rows=[['班级','学生姓名','缺勤日期','请假类型']];
+  data.forEach(g=>g.rows.forEach(x=>x.recs.forEach(r=>rows.push([g.cls.name,x.s.name,kqMD(r.date),r.reason||'未填']))));
+  exportSheet('所有班级缺勤人员.xlsx',rows);
 }
 function openMakeup(stuId){
   const id=stuId||'';
