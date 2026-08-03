@@ -337,6 +337,13 @@ body, .topbar, .sidebar, .card, .kpi, .list-item, .stu-card, .tag, .pill, .tabba
 .srow.total{background:var(--brand-soft);border-color:color-mix(in srgb,var(--brand) 30%,var(--line));margin-top:8px;margin-bottom:0}
 .srow.low .sv{color:var(--danger)}
 .srow.low .sbar i{background:linear-gradient(90deg,#f0a0a0,var(--danger))}
+/* 作业提交统计 · 学生打卡卡片（与截图一致） */
+.hw-card{display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);margin-bottom:8px}
+.hw-card.total{background:var(--brand-soft);border-color:color-mix(in srgb,var(--brand) 30%,var(--line));font-weight:700}
+.hw-card .hw-name{font-weight:700;font-size:15px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hw-card .hw-pills{display:flex;gap:7px;flex-shrink:0}
+.hw-card .hw-pills .tag{font-size:12px;padding:4px 8px;border-radius:999px;white-space:nowrap}
+.hw-card .hw-rate{font-weight:800;font-size:17px;min-width:48px;text-align:right;font-variant-numeric:tabular-nums;flex-shrink:0}
 /* 打卡率 小卡片 */
 .rate-pill{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;border:1px solid var(--line);border-radius:14px;background:var(--surface);min-height:74px;text-align:center}
 .rate-pill .rp-v{font-size:22px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
@@ -1098,7 +1105,7 @@ const BOTTOM=[
 const TITLES={home:'教师教学工作台',exams:'成绩记录',attendance:'作业打卡',kaoqin:'考勤管理',
   feedback:'上课反馈',remark:'学情评语',classmanage:'班级管理',students:'学生管理',
   archive:'档案 & 数据导入',points:'积分奖惩',ai:'AI文案生成',knowledge:'知识详情',schedule:'日程安排'};
-const APP_VER='v52 · 2026-08-03';
+const APP_VER='v53 · 2026-08-03';
 function renderSidebar(){
   const badgeOf=id=>id==='kaoqin'?kqUnmarkedPast():0;
   $('#sidebar').innerHTML=NAV.map((g,gi)=>`<div class="nav-title">${g.group}</div>`+
@@ -2109,8 +2116,8 @@ function viewAttendance(){
   const sumDone=stats.reduce((a,b)=>a+b.done,0);
   const sumMiss=sumTotal-sumDone;
   const sumRate=sumTotal?Math.round(sumDone/sumTotal*100):0;
-  const submitBody=`<div class="fold-scroll">${stats.length?stats.map(x=>srow(x.s.name,x.done,x.total,x.rate)).join(''):'<div class="empty">本月暂无作业记录</div>'}</div>`
-    +(stats.length?srow('本月合计',sumDone,sumTotal,sumRate,true):'');
+  const submitBody=`<div class="fold-scroll">${stats.length?stats.map(x=>hwCard(x.s.name,x.total,x.done,x.miss,x.rate)).join(''):'<div class="empty">本月暂无作业记录</div>'}</div>`
+    +(stats.length?hwCard('本月合计',sumTotal,sumDone,sumMiss,sumRate,true):'');
   const submitCard=statCard(`${monthName} 作业提交统计`,
     `${stats.length} 人 · 应交 ${sumTotal} · 已交 ${sumDone} · 未交 ${sumMiss}${stats.length?` · 提交率 ${sumRate}%`:''}`,
     submitBody,
@@ -2220,6 +2227,20 @@ function srow(name,done,total,rate,isTotal){
     +`<span class="smeta">${done}/${total}</span>`
     +`<span class="sbar"><i style="width:${r==null?0:r}%"></i></span>`
     +`<span class="sv">${r==null?'—':r+'%'}</span></div>`;
+}
+/* 作业打卡统计 · 单学生卡片：姓名 + 应交/已交/未交 标签 + 百分比 */
+function hwCard(name,total,done,miss,rate,isTotal){
+  const r=(rate==null||isNaN(rate))?null:Math.max(0,Math.min(100,rate));
+  const rateColor=r==null?'var(--muted)':r>=80?'var(--ok)':r>=60?'var(--gold)':'var(--danger)';
+  return `<div class="hw-card ${isTotal?'total':''}">`
+    +`<span class="hw-name">${esc(name)}</span>`
+    +`<span class="hw-pills">`
+      +`<span class="tag gray">应交 ${total}</span>`
+      +`<span class="tag ok">已交 ${done}</span>`
+      +`<span class="tag danger">未交 ${miss}</span>`
+    +`</span>`
+    +`<span class="hw-rate" style="color:${rateColor}">${r==null?'—':r+'%'}</span>`
+  +`</div>`;
 }
 function confirmAttendance(){
   const cls=curClass();let done=0,miss=0;
