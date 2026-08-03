@@ -102,6 +102,17 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--text)}
 .cat-tab{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:700;padding:6px 14px;border-radius:999px;background:var(--surface);color:var(--text-2);border:1px solid var(--line);cursor:pointer;transition:background .15s,color .15s,border-color .15s,transform .1s}
 .cat-tab.on{background:var(--brand);color:#fff;border-color:var(--brand)}
 .cat-tab:active{transform:scale(.96)}
+/* ===== 考勤课时统计：当日 / 当月 双组并列 ===== */
+.kq-two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.kq-grp{padding:12px}
+.kq-grp-hd{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--text-2);margin-bottom:10px}
+.kq-grp-hd b{color:var(--text);font-variant-numeric:tabular-nums}
+.kq-grp-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+.kq-grp-dot.day{background:#3b82f6}
+.kq-grp-dot.mon{background:#8b5cf6}
+.kq-kpi{gap:8px}
+.kq-kpi .kpi{min-height:80px}
+@media(max-width:400px){.kq-grp-hd{font-size:12px}}
 /* ===== 待办事项 ===== */
 .todo-list{margin-top:6px}
 .todo-item{display:flex;align-items:flex-start;gap:11px;padding:11px 2px;border-bottom:1px solid var(--line)}
@@ -1105,7 +1116,7 @@ const BOTTOM=[
 const TITLES={home:'教师教学工作台',exams:'成绩记录',attendance:'作业打卡',kaoqin:'考勤管理',
   feedback:'上课反馈',remark:'学情评语',classmanage:'班级管理',students:'学生管理',
   archive:'档案 & 数据导入',points:'积分奖惩',ai:'AI文案生成',knowledge:'知识详情',schedule:'日程安排'};
-const APP_VER='v55 · 2026-08-03';
+const APP_VER='v56 · 2026-08-03';
 function renderSidebar(){
   const badgeOf=id=>id==='kaoqin'?kqUnmarkedPast():0;
   $('#sidebar').innerHTML=NAV.map((g,gi)=>`<div class="nav-title">${g.group}</div>`+
@@ -2470,15 +2481,31 @@ function kqWindowDays(cls){
   if(cls.endDate&&cls.endDate<mTo)mTo=cls.endDate;
   return classDays(cls,mFrom,mTo);
 }
-/* 应到课时 = 截至今日「已排课总人次」= 已过去的排课日数 × 班级人数（不含未来排课日） */
-function kqExpectedSlots(cls,days){const t=todayStr();return days.filter(d=>d<=t).length*cls.students.length;}
-function kqAggWin(cls,days){
-  let present=0,absent=0;const reasons={};
-  days.forEach(d=>{const m=state.attendance[kqKey(cls.id,d)];if(!m)return;cls.students.forEach(id=>{const r=m[id];if(r&&r.status==='present')present++;else if(r&&r.status==='absent'){absent++;const rs=r.reason||'未填';reasons[rs]=(reasons[rs]||0)+1;}});});
-  const expected=kqExpectedSlots(cls,days);
-  const rate=expected?Math.round(present/expected*100):0;
-  return {present,absent,expected,reasons,days:days.length,rate};
+/* 统计某班级在指定日期集合内的「实到（签到到课）人次」 */
+function kqCountWin(cls,days){
+  let present=0;
+  days.forEach(d=>{const m=state.attendance[kqKey(cls.id,d)];if(!m)return;cls.students.forEach(id=>{const r=m[id];if(r&&r.status==='present')present++;});});
+  return present;
 }
+/* 单日课时聚合（新口径）：应到=排课学生总人次，实到=签到到课人次，缺课=应到-实到，出勤率=实到/应到 */
+function kqDayAgg(cls,date){
+  const inTerm=(!cls.startDate||date>=cls.startDate)&&(!cls.endDate||date<=cls.endDate);
+  const exp=(inTerm&&classDays(cls,date,date).length)?cls.students.length:0;
+  const present=kqCountWin(cls,[date]);
+  const absent=exp-present;
+  const rate=exp?Math.round(present/exp*100):null;
+  return {expected:exp,present,absent,rate};
+}
+/* 当月课时聚合（新口径）：应到=总学生人数×当月排课天数，实到=当月累计签到到课人次，缺课=应到-实到 */
+function kqMonthAgg(cls){
+  const days=kqMonthDays(cls);
+  const exp=cls.students.length*days.length;
+  const present=kqCountWin(cls,days);
+  const absent=exp-present;
+  const rate=exp?Math.round(present/exp*100):null;
+  return {expected:exp,present,absent,rate,days:days.length};
+}
+function kqRateTxt(rate){return rate===null?'—':rate+'%';}
 function kqMonthDays(c){
   const y=new Date().getFullYear(),m=state.kqMonth,mm=String(m+1).padStart(2,'0');
   let mFrom=`${y}-${mm}-01`,mTo=`${y}-${mm}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
@@ -2487,9 +2514,10 @@ function kqMonthDays(c){
   return classDays(c,mFrom,mTo);
 }
 function kqAggAllMonth(){
-  let present=0,absent=0,expected=0;
-  state.classes.forEach(c=>{const a=kqAggWin(c,kqMonthDays(c));present+=a.present;absent+=a.absent;expected+=a.expected;});
-  const rate=expected?Math.round(present/expected*100):0;
+  let present=0,expected=0;
+  state.classes.forEach(c=>{const a=kqMonthAgg(c);present+=a.present;expected+=a.expected;});
+  const absent=expected-present;
+  const rate=expected?Math.round(present/expected*100):null;
   return {present,absent,expected,total:expected,rate};
 }
 function kqStuDetailWin(cls,days){
@@ -2536,11 +2564,9 @@ function viewKaoqin(){
       <div class="att-bottom kq-reason"><select class="input att-score" ${locked?'disabled':''} onchange="kqSetReason('${id}',this.value)">${reasonOpts}</select></div>
     </div>`;}).join('');
   const ds=kqDayStats(cls,state.kqDate);
-  const wDays=kqWindowDays(cls);
-  const wAgg=kqAggWin(cls,wDays);
   const allK=kqAggAllMonth();
-  const winLabel={month:(state.kqMonth+1)+'月',all:'全部'}[state.kqRange||'month'];
-  const rate=wAgg.rate;
+  const dayAgg=kqDayAgg(cls,state.kqDate);
+  const monAgg=kqMonthAgg(cls);
   const dayAbsent=cls.students.map(id=>kqRec(cls.id,state.kqDate,id)).map((r,i)=>({r,n:cls.students[i]})).filter(x=>x.r&&x.r.status==='absent');
   const reasonList=Object.keys(ds.reasons).length?Object.entries(ds.reasons).map(([r,n])=>`<div class="list-item" style="margin:0 0 6px"><span style="font-weight:600">${esc(r)}</span><span class="tag danger" style="margin-left:auto">${n} 人</span></div>`).join(''):'<div class="empty">当天无缺勤</div>';
   const dayAbsentTxt=dayAbsent.length?dayAbsent.map(x=>`${esc(x.n.name)}（${esc(x.r.reason)}）`).join('、'):'— 全部到课 —';
@@ -2623,23 +2649,34 @@ function viewKaoqin(){
     <div class="section-head" style="margin-top:22px"><h2>${state.kqMonth+1}月 · 全部班级课时</h2>
       <div class="row" style="gap:4px"><button class="icon-btn" onclick="state.kqRange='month';kqPrevMonth()">‹</button><button class="icon-btn" onclick="state.kqRange='month';kqNextMonth()">›</button><span class="tag">汇总所有班</span></div></div>
     <div class="card" style="margin-bottom:12px">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">本月您名下全部班级的课时合计（应到 = 截至今日已排课总人次 = 已过去的排课日数 × 人数；缺课课时即缺到的人次数）</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">本月您名下全部班级课时合计 · 应到课时 = 全月排课总人次（班级总学生人数 × 当月排课天数，汇总所有班）；实到课时 = 本月累计签到到课人次；缺课课时 = 应到 − 实到</div>
       <div class="grid c4">
         <div class="kpi"><div class="v">${allK.expected}</div><div class="l">应到课时</div></div>
         <div class="kpi"><div class="v" style="color:#16a34a">${allK.present}</div><div class="l">实到课时</div></div>
         <div class="kpi"><div class="v" style="color:#dc2626">${allK.absent}</div><div class="l">缺课课时</div></div>
-        <div class="kpi"><div class="v">${allK.rate}%</div><div class="l">课时出勤率</div></div>
+        <div class="kpi"><div class="v">${kqRateTxt(allK.rate)}</div><div class="l">课时出勤率</div></div>
       </div>
     </div>
-    <div class="section-head" style="margin-top:22px"><h2>课时统计 · ${winLabel}</h2><button class="btn sm" onclick="exportKqRoster()">导出名单</button></div>
-    <div class="row" style="gap:6px;margin:6px 0 12px">
-      ${[['month','本月'],['all','全部']].map(o=>`<button class="cat-tab ${state.kqRange===o[0]?'on':''}" onclick="state.kqRange='${o[0]}';save();render()">${o[1]}</button>`).join('')}
-    </div>
-    <div class="grid c4" style="margin-bottom:12px">
-      <div class="kpi"><div class="v">${wAgg.expected}</div><div class="l">应到课时</div></div>
-      <div class="kpi"><div class="v" style="color:#16a34a">${wAgg.present}</div><div class="l">实到课时</div></div>
-      <div class="kpi"><div class="v" style="color:#dc2626">${wAgg.absent}</div><div class="l">缺课课时</div></div>
-      <div class="kpi"><div class="v">${rate}%</div><div class="l">课时出勤率</div></div>
+    <div class="section-head" style="margin-top:22px"><h2>课时统计</h2><span class="tag">${esc(cls.name)}</span><button class="btn sm" style="margin-left:auto" onclick="exportKqRoster()">导出名单</button></div>
+    <div class="kq-two-col">
+      <div class="card kq-grp">
+        <div class="kq-grp-hd"><span class="kq-grp-dot day"></span>当日数据 · <b>${state.kqDate}</b></div>
+        <div class="grid c2 kq-kpi">
+          <div class="kpi"><div class="v">${dayAgg.expected}</div><div class="l">当天应到课时</div></div>
+          <div class="kpi"><div class="v" style="color:#16a34a">${dayAgg.present}</div><div class="l">当天实到课时</div></div>
+          <div class="kpi"><div class="v" style="color:#dc2626">${dayAgg.absent}</div><div class="l">当天缺课课时</div></div>
+          <div class="kpi"><div class="v">${kqRateTxt(dayAgg.rate)}</div><div class="l">课时出勤率</div></div>
+        </div>
+      </div>
+      <div class="card kq-grp">
+        <div class="kq-grp-hd"><span class="kq-grp-dot mon"></span>当月累计数据 · <b>${state.kqMonth+1}月</b></div>
+        <div class="grid c2 kq-kpi">
+          <div class="kpi"><div class="v">${monAgg.expected}</div><div class="l">当月应到课时</div></div>
+          <div class="kpi"><div class="v" style="color:#16a34a">${monAgg.present}</div><div class="l">当月实到课时</div></div>
+          <div class="kpi"><div class="v" style="color:#dc2626">${monAgg.absent}</div><div class="l">当月缺课课时</div></div>
+          <div class="kpi"><div class="v">${kqRateTxt(monAgg.rate)}</div><div class="l">课时出勤率</div></div>
+        </div>
+      </div>
     </div>
     ${allAbsCard}`+makeupSection+reportSection;
 }
