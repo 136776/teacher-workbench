@@ -1105,7 +1105,7 @@ const BOTTOM=[
 const TITLES={home:'教师教学工作台',exams:'成绩记录',attendance:'作业打卡',kaoqin:'考勤管理',
   feedback:'上课反馈',remark:'学情评语',classmanage:'班级管理',students:'学生管理',
   archive:'档案 & 数据导入',points:'积分奖惩',ai:'AI文案生成',knowledge:'知识详情',schedule:'日程安排'};
-const APP_VER='v54 · 2026-08-03';
+const APP_VER='v55 · 2026-08-03';
 function renderSidebar(){
   const badgeOf=id=>id==='kaoqin'?kqUnmarkedPast():0;
   $('#sidebar').innerHTML=NAV.map((g,gi)=>`<div class="nav-title">${g.group}</div>`+
@@ -1965,16 +1965,34 @@ function hwMonthDates(cls){
   const set=new Set();clsStudents(cls).forEach(s=>(s.attLogs||[]).forEach(l=>{const d=new Date(l.date);if(d.getFullYear()===y&&d.getMonth()===m)set.add(l.date);}));
   return [...set].sort();
 }
+/* 本月应交日期（不截断到今天）—— 用于「打卡率」分母：当月应提交的作业打卡总次数，
+   包含本月尚未到来的上课日。未来日无法提交，不影响「已交」分子，只用于扩大「应提交」分母，
+   从而得到：打卡率 = 当月已交(全班) ÷ 当月应交(全班)。 */
+function hwMonthDatesFull(cls){
+  const y=new Date().getFullYear(),m=state.attMonth;
+  const mm=String(m+1).padStart(2,'0');
+  const first=`${y}-${mm}-01`;
+  let last=`${y}-${mm}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
+  if(classWeekDays(cls).length){
+    let from=first;
+    if(cls.startDate&&cls.startDate>from)from=cls.startDate;
+    if(cls.endDate&&cls.endDate<last)last=cls.endDate;
+    return classDays(cls,from,last);
+  }
+  const set=new Set();clsStudents(cls).forEach(s=>(s.attLogs||[]).forEach(l=>{const d=new Date(l.date);if(d.getFullYear()===y&&d.getMonth()===m)set.add(l.date);}));
+  return [...set].sort();
+}
 function hwMonthStats(cls){
   const dates=hwMonthDates(cls);const set=new Set(dates);const total=dates.length;
   return cls.students.map(id=>{const s=stuOf(id);const done=(s.attLogs||[]).filter(l=>l&&set.has(l.date)&&l.status==='done').length;const miss=Math.max(0,total-done);return {s,done,miss,total,rate:total?Math.round(done/total*100):0};});
 }
-/* 某窗口（一组上课日）内，班级作业打卡率：应提交 = 上课日数 × 人数，已交 = 状态为「已交」的人次 */
+/* 某窗口（一组上课日）内，班级作业打卡率：应提交 = 上课日数 × 在读人数，已交 = 状态为「已交」的人次 */
 function hwRateForWindow(cls,dates){
-  if(!dates||!dates.length||!cls.students.length)return {expected:0,done:0,rate:0,dates:0};
+  const stu=clsStudents(cls);
+  if(!dates||!dates.length||!stu.length)return {expected:0,done:0,rate:0,dates:0};
   const set=new Set(dates);let done=0;
-  clsStudents(cls).forEach(s=>{(s.attLogs||[]).forEach(l=>{if(l&&set.has(l.date)&&l.status==='done')done++;});});
-  const expected=dates.length*cls.students.length;
+  stu.forEach(s=>{(s.attLogs||[]).forEach(l=>{if(l&&set.has(l.date)&&l.status==='done')done++;});});
+  const expected=dates.length*stu.length;
   return {expected,done,rate:expected?Math.round(done/expected*100):0,dates:dates.length};
 }
 /* 当天 / 本周 的上课日集合（用于班级打卡率） */
@@ -1987,7 +2005,7 @@ function hwWeekDatesAt(cls,date){const mon=schedMonday(date);const sun=fmtD(new 
 function allClassHwMonthAgg(){
   const rows=[];let te=0,td=0;
   state.classes.forEach(c=>{
-    const dates=hwMonthDates(c);
+    const dates=hwMonthDatesFull(c);
     const r=hwRateForWindow(c,dates);
     te+=r.expected;td+=r.done;
     rows.push({cls:c,expected:r.expected,done:r.done,rate:r.expected?r.rate:null,dates:r.dates});
@@ -2103,7 +2121,7 @@ function viewAttendance(){
   // BT-2 班级总打卡率（当天 / 本周 / 本月）
   const rt=hwRateForWindow(cls,hwDayDates(cls));
   const rw=hwRateForWindow(cls,hwWeekDatesAt(cls,state.attDate));
-  const rm=hwRateForWindow(cls,hwMonthDates(cls));
+  const rm=hwRateForWindow(cls,hwMonthDatesFull(cls));
   const rv=r=>r.expected?r.rate+'%':'—';
   const rateCard=`<div class="section-head" style="margin-top:22px"><h2>班级总打卡率</h2><span class="tag">${esc(cls.name)}</span></div>
     <div class="grid c3">
@@ -2126,9 +2144,9 @@ function viewAttendance(){
   const agg=allClassHwMonthAgg();
   const aggRows=agg.rows.map(r=>({name:r.cls.name,expected:r.expected,done:r.done,rate:r.rate}));
   const aggTotal=agg.rows.length?{name:'全部班级汇总',expected:agg.totalExpected,done:agg.totalDone,rate:agg.totalRate}:null;
-  const aggTable=rateTable(['班级','应提交','已交','出勤率'],aggRows,aggTotal,{empty:'本月还没有班级设置上课星期'});
+  const aggTable=rateTable(['班级','应提交','已交','打卡率'],aggRows,aggTotal,{empty:'本月还没有班级设置上课星期'});
   const aggCard=statCard(`${state.attMonth+1}月 · 全部班级打卡率`,
-    agg.rows.length?`${agg.rows.length} 个班 · 应交 ${agg.totalExpected} · 已交 ${agg.totalDone} · 出勤率 ${agg.totalRate}%`:'暂无数据',
+    agg.rows.length?`${agg.rows.length} 个班 · 应交 ${agg.totalExpected} · 已交 ${agg.totalDone} · 打卡率 ${agg.totalRate}%`:'暂无数据',
     aggTable,
     `<button class="btn sm" onclick="exportAllClassHwRate()">导出</button>`);
   // BT-5 未交作业名单（点班级 → 看具体谁哪天没交）
@@ -2206,7 +2224,7 @@ function statCard(title,sub,body,tools){
   return `<div class="section-head" style="margin-top:22px"><h2>${title}</h2>${sub?`<span class="tag">${sub}</span>`:''}${tools?`<span style="margin-left:auto">${tools}</span>`:''}</div>
   <div class="card" style="padding:12px">${body}</div>`;
 }
-/* 通用统计表格模板：名称 / 应提交 / 已交 / 出勤率（累计作业打卡、全部班级打卡率 共用此模板）
+/* 通用统计表格模板：名称 / 应提交 / 已交 / 打卡率（累计作业打卡、全部班级打卡率 共用此模板）
    rows: [{name,expected,done,rate}]；total: {name,expected,done,rate} 或 null */
 function rateTable(headers, rows, total, opts){
   opts=opts||{};
