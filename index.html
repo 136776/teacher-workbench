@@ -916,7 +916,7 @@ const BOTTOM=[
 const TITLES={home:'教师教学工作台',exams:'成绩记录',attendance:'作业打卡',kaoqin:'考勤管理',
   feedback:'上课反馈',remark:'学情评语',classmanage:'班级管理',students:'学生管理',
   archive:'档案 & 数据导入',points:'积分奖惩',ai:'AI文案生成',knowledge:'知识详情',schedule:'日程安排'};
-const APP_VER='v45 · 2026-08-03';
+const APP_VER='v46 · 2026-08-03';
 function renderSidebar(){
   const badgeOf=id=>id==='kaoqin'?kqUnmarkedPast():0;
   $('#sidebar').innerHTML=NAV.map((g,gi)=>`<div class="nav-title">${g.group}</div>`+
@@ -1723,6 +1723,9 @@ function hwRateForWindow(cls,dates){
 /* 当天 / 本周 的上课日集合（用于班级打卡率） */
 function hwTodayDates(cls){const t=todayStr();const a=classDays(cls,t,t);return a;}
 function hwWeekDates(cls){const mon=schedMonday(todayStr());const sun=fmtD(new Date(parseD(mon).getTime()+6*864e5));return classDays(cls,mon,sun);}
+// 基于当前所选日期（state.attDate）的日/周窗口，用于「班级总打卡率」即时汇总
+function hwDayDates(cls){return classDays(cls,state.attDate,state.attDate);}
+function hwWeekDatesAt(cls,date){const mon=schedMonday(date);const sun=fmtD(new Date(parseD(mon).getTime()+6*864e5));return classDays(cls,mon,sun);}
 /* 汇总所有班级 · 当月作业打卡率（跟随作业打卡页的月份选择 state.attMonth） */
 function allClassHwMonthAgg(){
   const rows=[];let te=0,td=0;
@@ -1841,8 +1844,8 @@ function viewAttendance(){
     </div>
   </div>`;
   // BT-2 班级总打卡率（当天 / 本周 / 本月）
-  const rt=hwRateForWindow(cls,hwTodayDates(cls));
-  const rw=hwRateForWindow(cls,hwWeekDates(cls));
+  const rt=hwRateForWindow(cls,hwDayDates(cls));
+  const rw=hwRateForWindow(cls,hwWeekDatesAt(cls,state.attDate));
   const rm=hwRateForWindow(cls,hwMonthDates(cls));
   const rv=r=>r.expected?r.rate+'%':'—';
   const rateCard=`<div class="section-head" style="margin-top:22px"><h2>班级总打卡率</h2><span class="tag">${esc(cls.name)}</span></div>
