@@ -282,6 +282,11 @@ body, .topbar, .sidebar, .card, .kpi, .list-item, .stu-card, .tag, .pill, .tabba
 .att-score::-webkit-outer-spin-button,.att-score::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .att-score{-moz-appearance:textfield}
 /* 已交/未交 pill 按钮 */
+/* 缺勤原因行：默认隐藏，标记「未到」时即时展开（无需整页重绘） */
+.att-card .kq-reason{display:none}
+.att-card.absent .kq-reason{display:flex;animation:kqSlide .2s cubic-bezier(.4,0,.2,1)}
+@keyframes kqSlide{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.att-card.absent{border-color:color-mix(in srgb,var(--danger) 35%,var(--line))}
 .att-toggle{display:flex;gap:8px;flex-shrink:0}
 .att-toggle button{display:inline-flex;align-items:center;gap:5px;font-size:14px;font-weight:600;padding:9px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--text-2);transition:.15s}
 .att-toggle button:hover{filter:brightness(1.03)}
@@ -302,6 +307,34 @@ body, .topbar, .sidebar, .card, .kpi, .list-item, .stu-card, .tag, .pill, .tabba
 .acc-bar.open .ab-chev{transform:rotate(180deg)}
 .acc-body{overflow:hidden;transition:max-height .3s cubic-bezier(.4,0,.2,1),opacity .25s,margin .25s;max-height:0;opacity:0;margin-top:0}
 .acc-body.open{max-height:4000px;opacity:1;margin-top:12px}
+/* 通用可折叠统计区块 */
+.fold{border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--shadow);margin:0 0 10px;overflow:hidden;contain:layout style}
+.fold-head{display:flex;align-items:center;gap:11px;padding:12px 13px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;transition:background .16s}
+.fold-head:active{background:var(--brand-soft)}
+.fold .fh-ico{flex:0 0 auto;width:34px;height:34px;border-radius:10px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-size:16px}
+.fold .fh-main{flex:1;min-width:0}
+.fold .fh-title{font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
+.fold .fh-sub{font-size:11.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fold .fh-val{flex:0 0 auto;font-weight:800;font-size:18px;color:var(--brand);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.fold .fh-val small{font-size:11px;font-weight:700;opacity:.75}
+.fold .fh-chev{flex:0 0 auto;width:15px;text-align:center;font-size:13px;color:var(--muted);transition:transform .24s cubic-bezier(.4,0,.2,1)}
+.fold.open .fh-chev{transform:rotate(180deg)}
+.fold-body{overflow:hidden;max-height:0;opacity:0;transition:max-height .3s cubic-bezier(.4,0,.2,1),opacity .2s}
+.fold.open .fold-body{max-height:3200px;opacity:1}
+.fold-inner{padding:11px 13px 13px;border-top:1px solid var(--line);background:var(--surface-2)}
+.fold-tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.fold-scroll{max-height:340px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;margin:0 -3px;padding:0 3px}
+@media(min-width:1080px){.fold-scroll{max-height:480px}}
+/* 统计行（紧凑排版，替代 list-item 大卡） */
+.srow{display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:11px;background:var(--surface);border:1px solid var(--line);margin-bottom:5px;font-size:13px;content-visibility:auto;contain-intrinsic-size:auto 38px}
+.srow .sn{font-weight:700;flex:0 0 auto;max-width:34%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow .sbar{flex:1;min-width:34px;height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden}
+.srow .sbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--brand-2),var(--brand));transition:width .4s cubic-bezier(.4,0,.2,1)}
+.srow .sv{flex:0 0 auto;font-weight:800;color:var(--brand);font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
+.srow .smeta{flex:0 0 auto;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.srow.total{background:var(--brand-soft);border-color:color-mix(in srgb,var(--brand) 30%,var(--line));margin-top:8px;margin-bottom:0}
+.srow.low .sv{color:var(--danger)}
+.srow.low .sbar i{background:linear-gradient(90deg,#f0a0a0,var(--danger))}
 /* 打卡率 小卡片 */
 .rate-pill{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;border:1px solid var(--line);border-radius:14px;background:var(--surface);min-height:74px;text-align:center}
 .rate-pill .rp-v{font-size:22px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
@@ -847,7 +880,7 @@ function seed(){
     ],
     selectedStudentId:s1.id,stuSel:[],
     fbClassId:null,fbStuId:null,examClassId:null,remarkClassId:null,
-    attClassId:'c1',attDate:todayStr(),attMonth:new Date().getMonth(),attAccOpen:false,
+    attClassId:'c1',attDate:todayStr(),attMonth:new Date().getMonth(),attAccOpen:false,kqAccOpen:false,folds:{},
     kqDate:todayStr(),kqMonth:new Date().getMonth(),attendance:{},
     cmSelId:null,impClassId:null,
     settings:{hwFullAward:true,kqAward:true},
@@ -861,6 +894,8 @@ if(!state.stuSel)state.stuSel=[];
 if(!state.settings)state.settings={hwFullAward:true};
 if(!state.makeups)state.makeups=[];
 if(state.examDateFilter===undefined)state.examDateFilter='all';
+if(state.kqAccOpen===undefined)state.kqAccOpen=false;
+if(!state.folds||typeof state.folds!=='object')state.folds={};
 // 迁移：历史版本把考试日期存成「8月3日」，导致排序 / 曲线 / 筛选全部错乱，统一转 ISO
 if(Array.isArray(state.exams)){
   state.exams.forEach(e=>{
@@ -983,7 +1018,7 @@ const BOTTOM=[
 const TITLES={home:'教师教学工作台',exams:'成绩记录',attendance:'作业打卡',kaoqin:'考勤管理',
   feedback:'上课反馈',remark:'学情评语',classmanage:'班级管理',students:'学生管理',
   archive:'档案 & 数据导入',points:'积分奖惩',ai:'AI文案生成',knowledge:'知识详情',schedule:'日程安排'};
-const APP_VER='v48 · 2026-08-03';
+const APP_VER='v49 · 2026-08-03';
 function renderSidebar(){
   const badgeOf=id=>id==='kaoqin'?kqUnmarkedPast():0;
   $('#sidebar').innerHTML=NAV.map((g,gi)=>`<div class="nav-title">${g.group}</div>`+
@@ -1986,30 +2021,44 @@ function viewAttendance(){
   const sumDone=stats.reduce((a,b)=>a+b.done,0);
   const sumMiss=sumTotal-sumDone;
   const sumRate=sumTotal?Math.round(sumDone/sumTotal*100):0;
-  const submitCard=`<div class="section-head" style="margin-top:22px"><h2>${monthName} 作业提交统计</h2><button class="btn sm" onclick="exportHwMonth()">导出 Excel</button></div>
-    <div class="card" style="margin-bottom:10px;background:var(--brand-soft);border-color:color-mix(in srgb,var(--brand) 30%,var(--line))">
-      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <div style="font-weight:800;font-size:15px">本月合计</div>
-        <div class="row" style="gap:8px"><span class="tag gray">总应交 ${sumTotal}</span><span class="tag ok">总实交 ${sumDone}</span><span class="tag danger">未交 ${sumMiss}</span><b style="color:var(--brand);font-size:15px">${sumRate}%</b></div>
-      </div>
-    </div>
-    <div class="card">${stats.length?stats.map(x=>`<div class="list-item" style="margin:0 0 6px"><span style="font-weight:600">${esc(x.s.name)}</span><span class="tag gray">应交 ${x.total}</span><span class="tag ok">已交 ${x.done}</span><span class="tag danger">未交 ${x.miss}</span><b style="margin-left:auto;color:var(--brand)">${x.rate}%</b></div>`).join(''):'<div class="empty">本月暂无作业记录</div>'}</div>`;
+  const submitBody=`<div class="fold-scroll">${stats.length?stats.map(x=>srow(x.s.name,x.done,x.total,x.rate)).join(''):'<div class="empty">本月暂无作业记录</div>'}</div>`
+    +(stats.length?srow('本月合计',sumDone,sumTotal,sumRate,true):'');
+  const submitCard=foldBlock('hwSubmit','📊',`${monthName} 作业提交统计`,
+    `${stats.length} 人 · 应交 ${sumTotal} · 已交 ${sumDone} · 未交 ${sumMiss}`,
+    stats.length?`${sumRate}%`:'',submitBody,
+    `<button class="btn sm" onclick="exportHwMonth()">导出 Excel</button>`);
   // BT-4 汇总所有班级打卡率（跟随作业打卡页月份 state.attMonth）
   const agg=allClassHwMonthAgg();
-  const aggCard=`<div class="section-head" style="margin-top:22px"><h2>${state.attMonth+1}月 · 全部班级打卡率</h2><button class="btn sm" onclick="exportAllClassHwRate()">导出</button></div>
-    <div class="card">${agg.rows.length?agg.rows.map(r=>`<div class="list-item" style="margin:0 0 6px"><span style="font-weight:600">${esc(r.cls.name)}</span><span class="tag gray">上课 ${r.dates} 天</span><span class="tag ok">已交 ${r.done}</span><span class="tag danger">未交 ${r.expected-r.done}</span><b style="margin-left:auto;color:var(--brand)">${r.rate==null?'—':r.rate+'%'}</b></div>`).join('')+`<div class="list-item" style="margin:8px 0 0;background:var(--brand-soft);border-color:color-mix(in srgb,var(--brand) 30%,var(--line))"><b>汇总（全部班级）</b><span class="tag gray" style="margin-left:8px">应提交 ${agg.totalExpected}</span><span class="tag ok">已交 ${agg.totalDone}</span><span class="tag danger">未交 ${agg.totalExpected-agg.totalDone}</span><b style="margin-left:auto;color:var(--brand)">${agg.totalRate}%</b></div>`:'<div class="empty">本月还没有班级设置上课星期</div>'}</div>`;
+  const aggBody=`<div class="fold-scroll">${agg.rows.length?agg.rows.map(r=>srow(r.cls.name,r.done,r.expected,r.rate)).join(''):'<div class="empty">本月还没有班级设置上课星期</div>'}</div>`
+    +(agg.rows.length?srow('全部班级汇总',agg.totalDone,agg.totalExpected,agg.totalRate,true):'');
+  const aggCard=foldBlock('hwAllCls','🏫',`${state.attMonth+1}月 · 全部班级打卡率`,
+    agg.rows.length?`${agg.rows.length} 个班 · 应交 ${agg.totalExpected} · 已交 ${agg.totalDone}`:'暂无数据',
+    agg.rows.length?`${agg.totalRate}%`:'',aggBody,
+    `<button class="btn sm" onclick="exportAllClassHwRate()">导出</button>`);
   // BT-5 未交作业名单（点班级 → 看具体谁哪天没交）
   const miss=missHwByClass();
-  const missCard=`<div class="section-head" style="margin-top:22px"><h2>${state.attMonth+1}月 · 未交作业名单</h2><button class="btn sm" onclick="exportMissHw()">导出表格</button></div>
-    <div class="card">${miss.length?miss.map(g=>{const tm=g.rows.reduce((a,x)=>a+x.miss,0);return `<div class="miss-row" onclick="missHwDrill('${g.cls.id}')">
+  const missTotal=miss.reduce((a,g)=>a+g.rows.reduce((b,x)=>b+x.miss,0),0);
+  const missBody=`<div class="fold-scroll">${miss.length?miss.map(g=>{const tm=g.rows.reduce((a,x)=>a+x.miss,0);return `<div class="miss-row" style="margin-bottom:6px" onclick="missHwDrill('${g.cls.id}')">
       <div class="mr-badge">${tm}</div>
       <div style="flex:1;min-width:0"><b>${esc(g.cls.name)}</b><span style="font-size:12px;color:var(--muted);margin-left:8px">${g.rows.length} 人未交</span>
       <div class="miss-detail">${g.rows.slice(0,3).map(x=>esc(x.s.name)+'×'+x.miss).join('、')}${g.rows.length>3?' …':''}</div></div>
       <div class="ab-chev">›</div>
     </div>`;}).join(''):'<div class="empty">本月所有班级作业都已交齐 🎉</div>'}</div>`;
+  const missCard=foldBlock('hwMiss','⚠️',`${state.attMonth+1}月 · 未交作业名单`,
+    miss.length?`${miss.length} 个班 · 共 ${missTotal} 人次未交 · 点班级看明细`:'全部交齐 🎉',
+    miss.length?`<span style="color:var(--danger)">${missTotal}</span>`:'',missBody,
+    `<button class="btn sm" onclick="exportMissHw()">导出表格</button>`);
   // 累计作业打卡（开课至结课）
-  const totalCard=`<div class="section-head" style="margin-top:22px"><h2>累计作业打卡（开课至结课）</h2><button class="btn sm" onclick="exportHwTotal()">导出 Excel</button></div>
-    <div class="card">${(cfgOk&&totalStats.length)?totalStats.map(x=>`<div class="list-item" style="margin:0 0 6px"><span style="font-weight:600">${esc(x.s.name)}</span><span class="tag gray">应交 ${x.total}</span><span class="tag ok">已交 ${x.done}</span><span class="tag danger">未交 ${x.miss}</span><b style="margin-left:auto;color:var(--brand)">${x.rate}%</b></div>`).join(''):'<div class="empty">设置「开课起始日期 + 每周上课星期」后，自动统计累计应交次数</div>'}</div>`;
+  const tOk=cfgOk&&totalStats.length;
+  const tTotal=totalStats.reduce((a,b)=>a+b.total,0);
+  const tDone=totalStats.reduce((a,b)=>a+b.done,0);
+  const tRate=tTotal?Math.round(tDone/tTotal*100):0;
+  const totalBody=`<div class="fold-scroll">${tOk?totalStats.map(x=>srow(x.s.name,x.done,x.total,x.rate)).join(''):'<div class="empty">设置「开课起始日期 + 每周上课星期」后，自动统计累计应交次数</div>'}</div>`
+    +(tOk?srow('全期合计',tDone,tTotal,tRate,true):'');
+  const totalCard=foldBlock('hwTotal','🎓','累计作业打卡（开课至结课）',
+    tOk?`${totalStats.length} 人 · 应交 ${tTotal} · 已交 ${tDone} · 未交 ${tTotal-tDone}`:'未设置开课安排',
+    tOk?`${tRate}%`:'',totalBody,
+    `<button class="btn sm" onclick="exportHwTotal()">导出 Excel</button>`);
   return schedCard+`<div class="card" style="margin-bottom:12px">
       <div class="row" style="justify-content:space-between;margin-bottom:8px">
         <select class="input" style="width:auto;flex:1" onchange="state.curClassId=this.value;render()">${state.classes.map(c=>`<option value="${c.id}" ${c.id===curClass().id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
@@ -2024,10 +2073,8 @@ function viewAttendance(){
     </div></div>
     ${accBar}${accBody}
     ${rateCard}
-    ${submitCard}
-    ${aggCard}
-    ${missCard}
-    ${totalCard}`;
+    <div class="section-head" style="margin-top:22px"><h2>数据统计</h2><span class="tag">点标题展开</span></div>
+    ${submitCard}${aggCard}${missCard}${totalCard}`;
 }
 function attAccToggle(){
   state.attAccOpen=!state.attAccOpen;save();
@@ -2035,6 +2082,37 @@ function attAccToggle(){
   const body=document.getElementById('attAccBody');
   if(bar)bar.classList.toggle('open',state.attAccOpen);
   if(body)body.classList.toggle('open',state.attAccOpen);
+}
+/* ---------- 通用可折叠统计区块 ---------- */
+function foldOpen(k){return !!(state.folds&&state.folds[k]);}
+function foldToggle(k){
+  if(!state.folds)state.folds={};
+  state.folds[k]=!state.folds[k];
+  const el=document.getElementById('fold-'+k);
+  if(el)el.classList.toggle('open',state.folds[k]);
+  saveUI();
+}
+/* k=唯一键 ico=图标 title=标题 sub=摘要 val=右侧大数字 body=内容 tools=顶部按钮组 */
+function foldBlock(k,ico,title,sub,val,body,tools){
+  const on=foldOpen(k);
+  return `<div class="fold ${on?'open':''}" id="fold-${k}">
+    <div class="fold-head" onclick="foldToggle('${k}')">
+      <div class="fh-ico">${ico}</div>
+      <div class="fh-main"><div class="fh-title">${title}</div><div class="fh-sub">${sub}</div></div>
+      ${val?`<div class="fh-val">${val}</div>`:''}
+      <div class="fh-chev">▾</div>
+    </div>
+    <div class="fold-body"><div class="fold-inner">${tools?`<div class="fold-tools">${tools}</div>`:''}${body}</div></div>
+  </div>`;
+}
+/* 紧凑统计行：姓名 · 已交/应交 · 进度条 · 百分比 */
+function srow(name,done,total,rate,isTotal){
+  const r=(rate==null||isNaN(rate))?null:Math.max(0,Math.min(100,rate));
+  return `<div class="srow ${isTotal?'total':''} ${(r!=null&&r<60&&!isTotal)?'low':''}">`
+    +`<span class="sn">${esc(name)}</span>`
+    +`<span class="smeta">${done}/${total}</span>`
+    +`<span class="sbar"><i style="width:${r==null?0:r}%"></i></span>`
+    +`<span class="sv">${r==null?'—':r+'%'}</span></div>`;
 }
 function confirmAttendance(){
   const cls=curClass();let done=0,miss=0;
@@ -2045,18 +2123,52 @@ function confirmAttendance(){
 // ---------- 考勤管理（与开课安排联动） ----------
 function kqKey(cid,date){return cid+'::'+date;}
 function kqRec(cid,date,id){const m=state.attendance[kqKey(cid,date)];return m?m[id]:null;}
-function kqSet(id,status){
+/* 折叠登记条（当日考勤）——与作业打卡一致 */
+function kqAccToggle(){
+  state.kqAccOpen=!state.kqAccOpen;saveUI();
+  const bar=document.getElementById('kqAccBar');
+  const body=document.getElementById('kqAccBody');
+  if(bar)bar.classList.toggle('open',state.kqAccOpen);
+  if(body)body.classList.toggle('open',state.kqAccOpen);
+  kqRefreshSub();
+}
+/* 只刷新折叠条摘要，不整页重绘 */
+function kqRefreshSub(){
+  const el=document.getElementById('kqAccSub');if(!el)return;
+  const cls=curClass();const ds=kqDayStats(cls,state.kqDate);
+  const un=cls.students.length-ds.marked;
+  el.textContent=`${state.kqDate} · 已到 ${ds.present}/${cls.students.length}`
+    +(ds.absent?` · 缺 ${ds.absent}`:'')+(un>0?` · 未登记 ${un}`:'')
+    +(state.kqAccOpen?' · 点击收起':' · 点击展开登记');
+}
+/* 延迟整页重绘：点选先给即时反馈，统计随后跟上，避免每点一下都全页重排 */
+let _rsT=null;
+function renderSoon(ms){if(_rsT)clearTimeout(_rsT);_rsT=setTimeout(()=>{_rsT=null;render();},ms||420);}
+function kqSet(id,status,el){
   const cls=curClass();const date=state.kqDate;const key=kqKey(cls.id,date);
   if(!state.attendance[key])state.attendance[key]={};
   if(status==='present'){state.attendance[key][id]={status:'present',reason:''};}
   else{const ex=state.attendance[key][id];state.attendance[key][id]={status:'absent',reason:(ex&&ex.status==='absent'&&ex.reason)?ex.reason:'病假'};}
-  kqSyncPoints(cls,date);save();render();
+  kqSyncPoints(cls,date);save();
+  // 即时局部反馈：只改这张卡，不动整页
+  const card=el&&el.closest?el.closest('.att-card'):null;
+  if(card){
+    card.querySelectorAll('.att-toggle button').forEach(b=>{
+      const on=b.getAttribute('data-v')===status;
+      b.classList.toggle('on',on);
+      b.classList.toggle('ok',on&&status==='present');
+      b.classList.toggle('danger',on&&status==='absent');
+    });
+    card.classList.toggle('absent',status==='absent');
+    if(status==='absent'){const sel=card.querySelector('select');if(sel)sel.value=state.attendance[key][id].reason;}
+    kqRefreshSub();renderSoon();
+  }else render();
 }
 function kqSetReason(id,reason){
   const cls=curClass();const date=state.kqDate;const key=kqKey(cls.id,date);
   if(!state.attendance[key])state.attendance[key]={};
   state.attendance[key][id]={status:'absent',reason};
-  kqSyncPoints(cls,date);save();render();
+  kqSyncPoints(cls,date);save();renderSoon();
 }
 function kqMarkAll(){const cls=curClass();const date=state.kqDate;const key=kqKey(cls.id,date);state.attendance[key]=state.attendance[key]||{};cls.students.forEach(id=>{state.attendance[key][id]={status:'present',reason:''};});kqSyncPoints(cls,date);save();render();toast('已标记全班到课 ✓');}
 function kqClearDay(){const cls=curClass();const date=state.kqDate;const key=kqKey(cls.id,date);if(state.attendance[key])delete state.attendance[key];cls.students.forEach(id=>{const s=state.students[id];s.pointLogs=s.pointLogs.filter(p=>!(p.src==='kq'&&p.date===date));recalcPoints(s);});save();render();toast('已清空当天记录');}
@@ -2217,11 +2329,6 @@ function kqAggAllMonth(){
   const rate=total?Math.round(present/total*100):0;
   return {present,absent,total,rate};
 }
-function kqByReasonWin(cls,days){
-  const map={};
-  days.forEach(d=>{const m=state.attendance[kqKey(cls.id,d)];if(!m)return;cls.students.forEach(id=>{const r=m[id];if(r&&r.status==='absent'){const rs=r.reason||'未填';(map[rs]=map[rs]||[]).push({name:stuName(id),date:d});}});});
-  return map;
-}
 function kqStuDetailWin(cls,days){
   const set=new Set(days);
   return cls.students.map(id=>{const recs=[];Object.keys(state.attendance).forEach(k=>{if(!k.startsWith(cls.id+'::'))return;const ds=k.split('::')[1];if(!set.has(ds))return;const r=state.attendance[k][id];if(r&&r.status==='absent')recs.push({date:ds,reason:r.reason||'未填'});});recs.sort((a,b)=>a.date.localeCompare(b.date));return {id,s:state.students[id],recs};});
@@ -2255,14 +2362,14 @@ function viewKaoqin(){
     </div>
     ${cfgOk?`<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px">${winDays.map(d=>{const un=d<t&&!state.attendance[kqKey(cls.id,d)];return `<button onclick="kqSelectDate('${d}')" style="flex:0 0 auto;padding:5px 10px;border-radius:14px;border:1px solid ${un?'var(--danger)':'var(--line)'};background:${d===state.kqDate?'var(--brand)':'#fff'};color:${d===state.kqDate?'#fff':'var(--text)'};font-size:12px;white-space:nowrap">${kqMD(d)}${d===t?' ·今':''}${un?' <span style="color:#dc2626">●</span>':''}</button>`;}).join('')}</div>`:'<div style="font-size:12px;color:var(--muted)">⚠️ 未设置「开课起始日期 + 每周上课星期」，请在「开课配置」中设定，系统将自动生成上课日。</div>'}
   </div>`;
-  const tbtn=(id,val,icon,label,c)=>{const rec=kqRec(cls.id,state.kqDate,id);const on=rec&&rec.status===val;return `<button class="${on?'on '+c:''}" onclick="kqSet('${id}','${val}')">${icon} ${label}</button>`;};
+  const tbtn=(id,val,icon,label,c)=>{const rec=kqRec(cls.id,state.kqDate,id);const on=rec&&rec.status===val;return `<button class="${on?'on '+c:''}" data-v="${val}" onclick="kqSet('${id}','${val}',this)">${icon} ${label}</button>`;};
   const rows=cls.students.map(id=>{
     const rec=kqRec(cls.id,state.kqDate,id);const st=rec?rec.status:null;
     const reasonOpts=['病假','事假','旷课'].map(r=>`<option value="${r}" ${rec&&rec.reason===r?'selected':''}>${r}</option>`).join('');
-    return `<div class="att-card">
+    return `<div class="att-card ${st==='absent'?'absent':''}" data-sid="${id}">
       <div class="att-top"><div class="who"><div class="nn">${esc(stuName(id))}</div></div>
       <div class="att-toggle">${tbtn(id,'present','✓','已到','ok')}${tbtn(id,'absent','×','未到','danger')}</div></div>
-      ${st==='absent'?`<div class="att-bottom"><select class="input att-score" onchange="kqSetReason('${id}',this.value)">${reasonOpts}</select></div>`:''}
+      <div class="att-bottom kq-reason"><select class="input att-score" onchange="kqSetReason('${id}',this.value)">${reasonOpts}</select></div>
     </div>`;}).join('');
   const ds=kqDayStats(cls,state.kqDate);
   const wDays=kqWindowDays(cls);
@@ -2275,8 +2382,6 @@ function viewKaoqin(){
   const dayAbsentTxt=dayAbsent.length?dayAbsent.map(x=>`${esc(x.n.name)}（${esc(x.r.reason)}）`).join('、'):'— 全部到课 —';
   const det=kqStuDetailWin(cls,wDays).filter(x=>x.recs.length);
   const detHtml=det.length?det.map(x=>`<div class="list-item" style="margin:0 0 6px;flex-wrap:wrap"><span style="font-weight:600">${esc(x.s.name)}</span><span class="tag danger" style="margin-left:6px">缺勤 ${x.recs.length} 次</span><span style="margin-left:auto;font-size:12px;color:var(--muted)">${x.recs.map(r=>kqMD(r.date)+'·'+esc(r.reason)).join('、')}</span></div>`).join(''):'<div class="empty">暂无缺勤记录</div>';
-  const byR=kqByReasonWin(cls,wDays);
-  const byRHtml=Object.keys(byR).length?Object.keys(byR).map(r=>`<div style="margin-bottom:8px"><b>${esc(r)}（${byR[r].length} 人次）</b>：${byR[r].map(x=>esc(x.name)+' '+kqMD(x.date)).join('、')}</div>`).join(''):'<div class="empty">暂无请假记录</div>';
   const leaveItems=[];cls.students.forEach(id=>{const recs=[];Object.keys(state.attendance).forEach(k=>{if(!k.startsWith(cls.id+'::'))return;const ds=k.split('::')[1];const r=state.attendance[k][id];if(r&&r.status==='absent')recs.push({date:ds,reason:r.reason||'未填'});});if(recs.length)leaveItems.push({s:state.students[id],recs});});
   const leaveHtml=leaveItems.length?leaveItems.map(x=>`<div class="list-item" style="margin:0 0 6px;flex-wrap:wrap;align-items:flex-start"><b>${esc(x.s.name)}</b><span class="tag danger" style="margin-left:6px">${x.recs.length} 次请假</span><span style="margin-left:auto;font-size:12px;color:var(--muted);text-align:right">${x.recs.map(r=>kqMD(r.date)+'·'+esc(r.reason)).join('、')}</span></div>`).join(''):'<div class="empty">暂无请假记录</div>';
   const kqAwardCard=`<div class="card" style="margin-bottom:12px"><div class="row" style="justify-content:space-between">
@@ -2306,13 +2411,30 @@ function viewKaoqin(){
   const makeupSection=`<div class="section-head" style="margin-top:22px"><h2>📚 补课安排</h2><button class="btn sm" onclick="openMakeup()">＋ 新增补课</button></div>
     <div class="card" style="margin-bottom:10px"><div style="font-weight:600;font-size:13px;margin-bottom:6px">缺勤学生（点「安排补课」选日期补课）</div>${absRows}</div>
     <div class="card"><div style="font-weight:600;font-size:13px;margin-bottom:6px">补课记录</div>${mkRows}</div>`;
-  return classCard+schedCard+dateBar+kqAwardCard+
-    `<div class="banner">📋 <b>${state.kqDate}</b> 考勤登记：点选「已到 / 未到」，未到可标注请假类型（病假 / 事假 / 旷课）；考勤日由开课安排自动生成。</div>
-    <div class="card" style="margin-bottom:12px"><div class="row" style="justify-content:space-between">
-      <div><div style="font-weight:700">当日考勤</div><div style="font-size:12px;color:var(--muted)">${cls.name} · ${cls.students.length} 人</div></div>
-      <div class="row" style="gap:6px"><button class="btn" onclick="kqMarkAll()">✅ 全班到课</button><button class="btn ghost sm" onclick="kqClearDay()">清空</button></div>
-    </div></div>
+  // 当日考勤 · 折叠登记条（与作业打卡一致）
+  const kqOpen=!!state.kqAccOpen;
+  const unmarked=cls.students.length-ds.marked;
+  const kqSub=`${state.kqDate} · 已到 ${ds.present}/${cls.students.length}`
+    +(ds.absent?` · 缺 ${ds.absent}`:'')+(unmarked>0?` · 未登记 ${unmarked}`:'')
+    +(kqOpen?' · 点击收起':' · 点击展开登记');
+  const kqAccBar=`<div class="acc-bar ${kqOpen?'open':''}" id="kqAccBar" onclick="kqAccToggle()">
+    <div class="ab-ico">📋</div>
+    <div class="ab-main">
+      <div class="ab-title">${esc(cls.name)} · 当日考勤</div>
+      <div class="ab-sub" id="kqAccSub">${kqSub}</div>
+    </div>
+    <div class="ab-chev">▾</div>
+  </div>`;
+  const kqAccBody=`<div class="acc-body ${kqOpen?'open':''}" id="kqAccBody">
+    <div class="att-toolbar">
+      <button class="btn" onclick="kqMarkAll()">✅ 全班到课</button>
+      <button class="btn ghost" onclick="kqClearDay()">清空当天</button>
+    </div>
     <div class="att-list">${rows||'<div class="empty">本班暂无学生</div>'}</div>
+  </div>`;
+  return classCard+schedCard+dateBar+kqAwardCard+
+    `<div class="banner">📋 <b>${state.kqDate}</b> 考勤登记：点上方长条展开名单，点选「已到 / 未到」，未到可标注请假类型（病假 / 事假 / 旷课）；考勤日由开课安排自动生成。</div>
+    ${kqAccBar}${kqAccBody}
     <div class="section-head" style="margin-top:18px"><h2>${state.kqDate} 出勤</h2></div>
     <div class="card" style="padding:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
       <div style="flex:0 0 auto">${kqPie(ds.present,ds.absent)}</div>
@@ -2342,8 +2464,6 @@ function viewKaoqin(){
       <div class="kpi"><div class="v" style="color:#dc2626">${wAgg.absent}</div><div class="l">缺课课时</div></div>
       <div class="kpi"><div class="v">${rate}%</div><div class="l">课时出勤率</div></div>
     </div>
-    <div class="section-head" style="margin-top:6px"><h2>按请假类型统计</h2></div>
-    <div class="card">${byRHtml}</div>
     <div class="section-head" style="margin-top:22px"><h2>请假名单</h2><button class="btn sm" onclick="exportKqLeave()">导出表格</button></div>
     <div class="card">${leaveHtml}</div>
     <div class="section-head" style="margin-top:22px"><h2>学生缺勤明细</h2><span class="tag">点开可看清每次请假</span></div>
