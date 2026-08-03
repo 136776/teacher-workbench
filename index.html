@@ -916,7 +916,7 @@ const BOTTOM=[
 const TITLES={home:'教师教学工作台',exams:'成绩记录',attendance:'作业打卡',kaoqin:'考勤管理',
   feedback:'上课反馈',remark:'学情评语',classmanage:'班级管理',students:'学生管理',
   archive:'档案 & 数据导入',points:'积分奖惩',ai:'AI文案生成',knowledge:'知识详情',schedule:'日程安排'};
-const APP_VER='v46 · 2026-08-03';
+const APP_VER='v47 · 2026-08-03';
 function renderSidebar(){
   const badgeOf=id=>id==='kaoqin'?kqUnmarkedPast():0;
   $('#sidebar').innerHTML=NAV.map((g,gi)=>`<div class="nav-title">${g.group}</div>`+
@@ -925,7 +925,7 @@ function renderSidebar(){
         <span class="nav-label">${esc(it.label)}</span>
         ${b?`<span onclick="kqPatchFirst();event.stopPropagation()" title="一键补登（不跳转）" style="margin-left:auto;min-width:16px;height:16px;background:var(--danger);color:#fff;border-radius:9px;font-size:10px;line-height:16px;text-align:center;padding:0 4px;cursor:pointer">${b}</span>`:''}
       </button>`;}).join('')).join('')
-    +`<div style="margin-top:18px;padding:10px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--line);line-height:1.6">版本 ${APP_VER}<br><span style="color:var(--brand);cursor:pointer" onclick="hardRefresh()">强制拉取最新版 ↻</span></div>`;
+    +`<div style="margin-top:18px;padding:10px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--line);line-height:1.6">版本 ${APP_VER}<br><a href="/teacher-workbench/teacher-workbench.apk" style="color:var(--brand);text-decoration:none;display:inline-block;margin:4px 0" download>📱 下载安卓版 App</a><br><span style="color:var(--brand);cursor:pointer" onclick="hardRefresh()">强制拉取最新版 ↻</span></div>`;
 }
 function kqUpcoming(n){
   const t=todayStr();const seen=new Set();const list=[];
