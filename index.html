@@ -1118,7 +1118,7 @@ const BOTTOM=[
 const TITLES={home:'教师教学工作台',exams:'成绩记录',attendance:'作业打卡',kaoqin:'考勤管理',
   feedback:'上课反馈',remark:'学情评语',classmanage:'班级管理',students:'学生管理',
   archive:'档案 & 数据导入',points:'积分奖惩',ai:'AI文案生成',knowledge:'知识详情',schedule:'日程安排'};
-const APP_VER='v57 · 2026-08-03';
+const APP_VER='v58 · 2026-08-03';
 function renderSidebar(){
   const badgeOf=id=>id==='kaoqin'?kqUnmarkedPast():0;
   $('#sidebar').innerHTML=NAV.map((g,gi)=>`<div class="nav-title">${g.group}</div>`+
@@ -1817,8 +1817,14 @@ function syncAttDateToMonth(){
   }
 }
 function selectAttDate(ds){state.attDate=ds;const d=parseD(ds);if(d)state.attMonth=d.getMonth();save();render();}
+/* 作业登记锁定：按「班级+日期」锁定，防止误触改错当天记录（与考勤「确定考勤/更改考勤」一致） */
+function attLockKey(cid,date){return cid+'::'+date;}
+function attIsLocked(){const cls=curClass();const key=attLockKey(cls.id,state.attDate);return !!(state.attLocked&&state.attLocked[key]);}
+function attConfirmDay(){const cls=curClass();const key=attLockKey(cls.id,state.attDate);if(!state.attLocked)state.attLocked={};state.attLocked[key]=true;save();render();toast('✅ 已确定作业登记，已锁定防误触');}
+function attUnlockDay(){const cls=curClass();const key=attLockKey(cls.id,state.attDate);if(!state.attLocked)state.attLocked={};state.attLocked[key]=false;save();render();toast('✏️ 已解锁，可更改作业登记');}
 function attStatusOf(id,date){const s=state.students[id];if(!s)return null;const l=(s.attLogs||[]).find(x=>x&&x.date===date);return l?l.status:null;}
 function setAtt(id,status){
+  if(attIsLocked()){toast('作业登记已确定，请先点「更改作业登记」');return;}
   const s=stuOf(id);const date=state.attDate;
   const ex=s.attLogs.find(x=>x.date===date);
   if(ex)ex.status=status; else s.attLogs.push({date,status,note:''});
@@ -1849,31 +1855,51 @@ function gradeHw(id,val){
   else toast(s.name+' 作业积分 +'+newPts+(wrong===0?'（全对）':'（错'+wrong+'题）'));
 }
 function scoreHw(id,pts){
+  if(attIsLocked()){toast('作业登记已确定，请先点「更改作业登记」');return;}
   if(pts===''||pts==null||String(pts).trim()===''||isNaN(pts)){applyHwScore(id,null);return;}
   const wrong=Math.max(0,Math.min(15,15-(+pts)));
   applyHwScore(id,wrong);
 }
-function markAllDone(){const cls=curClass();const date=state.attDate;cls.students.forEach(id=>{const s=stuOf(id);const ex=s.attLogs.find(x=>x.date===date);if(ex)ex.status='done';else s.attLogs.push({date,status:'done',note:''});});save();render();toast('已标记全班已交 ✓');}
+function markAllDone(){if(attIsLocked()){toast('作业登记已确定，请先点「更改作业登记」');return;}const cls=curClass();const date=state.attDate;cls.students.forEach(id=>{const s=stuOf(id);const ex=s.attLogs.find(x=>x.date===date);if(ex)ex.status='done';else s.attLogs.push({date,status:'done',note:''});});save();render();toast('已标记全班已交 ✓');}
 function canHwFull(s){if(!s)return false;const m=state.attMonth,y=new Date().getFullYear();const recs=(s.attLogs||[]).filter(l=>{if(!l)return false;const d=new Date(l.date);return d.getFullYear()===y&&d.getMonth()===m;});if(!recs.length)return false;return recs.every(r=>r.status==='done');}
-function awardHwFull(id){const s=stuOf(id);if(!canHwFull(s)){toast(s.name+' 本月未全勤提交');return;}if(s.pointLogs.some(p=>p.src==='hwFull'&&p.date===fmtDate(new Date()))){toast(s.name+' 本月全勤奖已发放');return;}s.pointLogs.unshift({pts:50,note:'「本月作业全勤奖」',src:'hwFull',date:fmtDate(new Date())});recalcPoints(s);save();render();toast(s.name+' 作业全勤 +50 🏆');}
-function awardClassHwFull(){const cls=curClass();let n=0;cls.students.forEach(id=>{const s=state.students[id];if(canHwFull(s)&&!s.pointLogs.some(p=>p.src==='hwFull'&&p.date===fmtDate(new Date()))){s.pointLogs.unshift({pts:50,note:'「本月作业全勤奖」',src:'hwFull',date:fmtDate(new Date())});recalcPoints(s);n++;}});save();render();toast(`本班 ${n} 人获得作业全勤 +50 🏆`);}
+function awardHwFull(id){if(attIsLocked()){toast('作业登记已确定，请先点「更改作业登记」');return;}const s=stuOf(id);if(!canHwFull(s)){toast(s.name+' 本月未全勤提交');return;}if(s.pointLogs.some(p=>p.src==='hwFull'&&p.date===fmtDate(new Date()))){toast(s.name+' 本月全勤奖已发放');return;}s.pointLogs.unshift({pts:50,note:'「本月作业全勤奖」',src:'hwFull',date:fmtDate(new Date())});recalcPoints(s);save();render();toast(s.name+' 作业全勤 +50 🏆');}
+function awardClassHwFull(){if(attIsLocked()){toast('作业登记已确定，请先点「更改作业登记」');return;}const cls=curClass();let n=0;cls.students.forEach(id=>{const s=state.students[id];if(canHwFull(s)&&!s.pointLogs.some(p=>p.src==='hwFull'&&p.date===fmtDate(new Date()))){s.pointLogs.unshift({pts:50,note:'「本月作业全勤奖」',src:'hwFull',date:fmtDate(new Date())});recalcPoints(s);n++;}});save();render();toast(`本班 ${n} 人获得作业全勤 +50 🏆`);}
+/* 作业打卡日历 —— 与考勤打卡日历一致：日期输入框 + ‹ › 按上课日前后切换 + 今天 + 横向上课日快捷条（今日标记·今、历史未登记红色●、选中高亮品牌色） */
+function attAllSchoolDays(cls){
+  const w=classWeekDays(cls);if(!w.length)return [];
+  let a=cls.startDate?parseD(cls.startDate):parseD('2000-01-01');
+  let b=cls.endDate?parseD(cls.endDate):parseD(kqShiftStr(todayStr(),120));
+  if(a>b)return [];
+  return classDays(cls,fmtD(a),fmtD(b));
+}
+function attShift(delta){
+  const cls=curClass();const days=attAllSchoolDays(cls);
+  if(!days.length){const d=parseD(state.attDate)||new Date();d.setDate(d.getDate()+delta);selectAttDate(fmtD(d));return;}
+  let i=days.indexOf(state.attDate);
+  if(i<0){const cur=parseD(state.attDate);i=days.findIndex(ds=>parseD(ds)>=cur);if(i<0)i=days.length;}
+  let ni=i+delta; if(ni<0)ni=0; if(ni>=days.length)ni=days.length-1;
+  selectAttDate(days[ni]);
+}
 function buildCalendar(){
+  const cls=curClass();
   const y=new Date().getFullYear();const m=state.attMonth;
-  const startDow=new Date(y,m,1).getDay();const days=new Date(y,m+1,0).getDate();
-  const wd=['日','一','二','三','四','五','六'];
-  const cc=curClass();
-  const schSet=new Set(classDays(cc,`${y}-${String(m+1).padStart(2,'0')}-01`,`${y}-${String(m+1).padStart(2,'0')}-${String(days).padStart(2,'0')}`).filter(ds=>(!cc.startDate||ds>=cc.startDate)&&(!cc.endDate||ds<=cc.endDate)));
-  let html=wd.map(w=>`<div class="wd">${w}</div>`).join('');
-  for(let i=0;i<startDow;i++)html+=`<div class="day out"></div>`;
-  for(let d=1;d<=days;d++){
-    const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const has=clsStudents(curClass()).some(s=>(s.attLogs||[]).some(l=>l&&l.date===ds));
-    const sel=ds===state.attDate?'sel':'';
-    const isToday=ds===todayStr()?'today':'';
-    const isSch=schSet.has(ds)?'sch':'';
-    html+=`<div class="day ${sel} ${isToday} ${isSch}" onclick="selectAttDate('${ds}')">${d}${has?'<span class="dot"></span>':''}</div>`;
-  }
-  return `<div class="cal">${html}</div>`;
+  const from=`${y}-${String(m+1).padStart(2,'0')}-01`;
+  const to=`${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
+  const schDays=classDays(cls,from,to).filter(ds=>(!cls.startDate||ds>=cls.startDate)&&(!cls.endDate||ds<=cls.endDate));
+  const t=todayStr();
+  const cfgOk=!!(cls.startDate&&classWeekDays(cls).length);
+  const pills=cfgOk?`<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px">${schDays.map(d=>{
+    const un=d<t&&!clsStudents(cls).some(s=>(s.attLogs||[]).some(l=>l&&l.date===d));
+    const isSel=d===state.attDate;
+    return `<button onclick="selectAttDate('${d}')" style="flex:0 0 auto;padding:5px 10px;border-radius:14px;border:1px solid ${un?'var(--danger)':'var(--line)'};background:${isSel?'var(--brand)':'#fff'};color:${isSel?'#fff':'var(--text)'};font-size:12px;white-space:nowrap">${kqMD(d)}${d===t?' ·今':''}${un?' <span style="color:#dc2626">●</span>':''}</button>`;
+  }).join('')}</div>`:'<div style="font-size:12px;color:var(--muted)">⚠️ 未设置「开课起始日期 + 每周上课星期」，请在「开课配置」中设定，系统将自动生成上课日。</div>';
+  return `<div class="row" style="gap:6px;margin-bottom:8px">
+      <button class="icon-btn" onclick="attShift(-1)">‹</button>
+      <input class="input" type="date" value="${state.attDate}" onchange="selectAttDate(this.value)" style="flex:1;min-width:0">
+      <button class="icon-btn" onclick="attShift(1)">›</button>
+      <button class="btn ghost sm" onclick="selectAttDate(todayStr())">今天</button>
+    </div>
+    ${pills}`;
 }
 // ---------- 上课日程 / 应交次数自动计算 ----------
 const WD_CN=['日','一','二','三','四','五','六'];
@@ -2115,20 +2141,21 @@ function exportHwTotal(){
 }
 function viewAttendance(){
   const cls=curClass();
+  const locked=attIsLocked();
   const monthName=`${state.attMonth+1}月`;
   const rows=clsStudents(cls).map(s=>{const id=s.id;const st=attStatusOf(id,state.attDate);
     const al=(s.attLogs||[]).find(l=>l&&l.date===state.attDate);
     const hwWrong=al&&al.hwWrong!=null?al.hwWrong:null;
     const curPts=hwWrong!=null?Math.max(0,15-hwWrong):'';
-    const tbtn=(val,icon,label,c)=>`<button class="${st===val?'on '+c:''}" onclick="setAtt('${id}','${val}')">${icon} ${label}</button>`;
+    const tbtn=(val,icon,label,c)=>`<button class="${st===val?'on '+c:''}" ${locked?'disabled':''} onclick="setAtt('${id}','${val}')">${icon} ${label}</button>`;
     return `<div class="att-card">
       <div class="att-top">
         <div class="who"><div class="nn">${esc(s.name)}</div></div>
         <div class="att-toggle">${tbtn('done','✓','已交','ok')}${tbtn('miss','×','未交','danger')}</div>
       </div>
       <div class="att-bottom">
-        <input type="number" inputmode="numeric" min="0" max="15" placeholder="积分登记" class="input att-score" value="${curPts}" oninput="scoreHw('${id}',this.value)">
-        <button class="btn outline-gold sm" onclick="awardHwFull('${id}')">全勤</button>
+        <input type="number" inputmode="numeric" min="0" max="15" placeholder="积分登记" class="input att-score" value="${curPts}" ${locked?'disabled':''} oninput="scoreHw('${id}',this.value)">
+        <button class="btn outline-gold sm" ${locked?'disabled':''} onclick="awardHwFull('${id}')">全勤</button>
       </div>
     </div>`;}).join('');
   const stats=hwMonthStats(cls);
@@ -2146,19 +2173,19 @@ function viewAttendance(){
     <div class="ab-ico">📝</div>
     <div class="ab-main">
       <div class="ab-title">${esc(cls.name)} · 作业登记</div>
-      <div class="ab-sub">${cls.students.length} 人 · ${state.attDate} 已交 ${doneToday}/${cls.students.length}${accOpen?' · 点击收起':' · 点击展开登记'}</div>
+      <div class="ab-sub">${cls.students.length} 人 · ${state.attDate} 已交 ${doneToday}/${cls.students.length}${locked?' · ✅已确定':' · 未确定'}${accOpen?' · 点击收起':' · 点击展开登记'}</div>
     </div>
     <div class="ab-chev">▾</div>
   </div>`;
   const accBody=`<div class="acc-body ${accOpen?'open':''}" id="attAccBody">
     <div class="att-toolbar">
-      <button class="btn" onclick="markAllDone()">✅ 一键全部已交</button>
-      <button class="btn outline-gold" onclick="awardClassHwFull()">🏆 核算本月作业全勤</button>
+      ${locked
+        ? `<button class="btn" onclick="attUnlockDay()">✏️ 更改作业登记</button><span class="tag" style="margin-left:auto;background:var(--ok);color:#fff">✅ 今日作业登记已确定</span>`
+        : `<button class="btn" onclick="markAllDone()">✅ 一键全部已交</button>
+           <button class="btn ghost" onclick="awardClassHwFull()">🏆 核算全勤</button>
+           <button class="btn outline-gold" style="margin-left:auto" onclick="attConfirmDay()">🔒 确定作业登记</button>`}
     </div>
     <div class="att-list">${rows||'<div class="empty">本班暂无学生</div>'}</div>
-    <div class="att-foot">
-      <button class="confirm-btn" onclick="confirmAttendance()">✅ 确定 · 保存当天作业登记</button>
-    </div>
   </div>`;
   // BT-2 班级总打卡率（当天 / 本周 / 本月）
   const rt=hwRateForWindow(cls,hwDayDates(cls));
@@ -2309,12 +2336,6 @@ function hwCard(name,total,done,miss,rate,isTotal){
     +`</span>`
     +`<span class="hw-rate" style="color:${rateColor}">${r==null?'—':r+'%'}</span>`
   +`</div>`;
-}
-function confirmAttendance(){
-  const cls=curClass();let done=0,miss=0;
-  cls.students.forEach(id=>{const st=attStatusOf(id,state.attDate);if(st==='done')done++;else if(st==='miss')miss++;});
-  save();render();
-  toast(`✅ 已保存 · 已交 ${done} 人 / 未交 ${miss} 人`);
 }
 // ---------- 考勤管理（与开课安排联动） ----------
 function kqKey(cid,date){return cid+'::'+date;}
