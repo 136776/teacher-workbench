@@ -104,6 +104,8 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--text)}
 .cat-tab:active{transform:scale(.96)}
 /* ===== 考勤课时统计：当日 / 当月 双组并列 ===== */
 .kq-two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.hw-rate-two{align-items:start}
+@media(max-width:640px){.hw-rate-two{grid-template-columns:1fr}}
 .kq-grp{padding:12px}
 .kq-grp-hd{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--text-2);margin-bottom:10px}
 .kq-grp-hd b{color:var(--text);font-variant-numeric:tabular-nums}
@@ -1116,7 +1118,7 @@ const BOTTOM=[
 const TITLES={home:'教师教学工作台',exams:'成绩记录',attendance:'作业打卡',kaoqin:'考勤管理',
   feedback:'上课反馈',remark:'学情评语',classmanage:'班级管理',students:'学生管理',
   archive:'档案 & 数据导入',points:'积分奖惩',ai:'AI文案生成',knowledge:'知识详情',schedule:'日程安排'};
-const APP_VER='v56 · 2026-08-03';
+const APP_VER='v57 · 2026-08-03';
 function renderSidebar(){
   const badgeOf=id=>id==='kaoqin'?kqUnmarkedPast():0;
   $('#sidebar').innerHTML=NAV.map((g,gi)=>`<div class="nav-title">${g.group}</div>`+
@@ -2023,7 +2025,29 @@ function allClassHwMonthAgg(){
   });
   return {rows,totalExpected:te,totalDone:td,totalRate:te?Math.round(td/te*100):0};
 }
-/* 未交作业名单：按班级聚合，列出本月哪些学生哪几天没交（状态非「已交」） */
+/* 汇总所有班级 · 本周（自然周 周一~周日，基于今天）作业打卡率 */
+function allClassHwWeekAgg(){
+  const mon=schedMonday(todayStr());
+  const sun=fmtD(new Date(parseD(mon).getTime()+6*864e5));
+  const rows=[];let te=0,td=0;
+  state.classes.forEach(c=>{
+    let from=mon,last=sun;
+    if(c.startDate&&c.startDate>from)from=c.startDate;
+    if(c.endDate&&c.endDate<last)last=c.endDate;
+    const dates=classDays(c,from,last);
+    const r=hwRateForWindow(c,dates);
+    te+=r.expected;td+=r.done;
+    rows.push({cls:c,expected:r.expected,done:r.done,rate:r.expected?r.rate:null,dates:r.dates});
+  });
+  return {rows,totalExpected:te,totalDone:td,totalRate:te?Math.round(td/te*100):0,weekStart:mon,weekEnd:sun};
+}
+/* 全部班级打卡率（本周 / 当月）通用卡片：打卡率 = 已交人次 ÷ 应提交人次 */
+function allClassHwRateCard(agg,title,sub,onExport){
+  const rows=agg.rows.map(r=>({name:r.cls.name,expected:r.expected,done:r.done,rate:r.rate}));
+  const total=agg.rows.length?{name:'全部班级汇总',expected:agg.totalExpected,done:agg.totalDone,rate:agg.totalRate}:null;
+  const table=rateTable(['班级','应提交','已交','打卡率'],rows,total,{empty:'还没有班级设置上课星期'});
+  return statCard(title,sub,table,`<button class="btn sm" onclick="${onExport}">导出</button>`);
+}
 function missHwByClass(){
   const out=[];
   state.classes.forEach(c=>{
@@ -2044,6 +2068,13 @@ function exportAllClassHwRate(){
   agg.rows.forEach(r=>{rows.push([r.cls.name,r.dates,r.expected,r.done,(r.rate==null?'—':r.rate+'%')]);});
   rows.push(['汇总（全部班级）',agg.rows.reduce((a,b)=>a+b.dates,0),agg.totalExpected,agg.totalDone,agg.totalRate+'%']);
   exportSheet(`${state.attMonth+1}月-全部班级作业打卡率.xlsx`,rows);
+}
+function exportAllClassHwRateWeek(){
+  const agg=allClassHwWeekAgg();
+  const rows=[['班级','本周上课日数','应提交人次','已交人次','提交率']];
+  agg.rows.forEach(r=>{rows.push([r.cls.name,r.dates,r.expected,r.done,(r.rate==null?'—':r.rate+'%')]);});
+  rows.push(['汇总（全部班级）',agg.rows.reduce((a,b)=>a+b.dates,0),agg.totalExpected,agg.totalDone,agg.totalRate+'%']);
+  exportSheet(`本周(${agg.weekStart}~${agg.weekEnd})-全部班级作业打卡率.xlsx`,rows);
 }
 function exportMissHw(clsId){
   let data=missHwByClass();
@@ -2151,15 +2182,15 @@ function viewAttendance(){
     `${stats.length} 人 · 应交 ${sumTotal} · 已交 ${sumDone} · 未交 ${sumMiss}${stats.length?` · 提交率 ${sumRate}%`:''}`,
     submitBody,
     `<button class="btn sm" onclick="exportHwMonth()">导出 Excel</button>`);
-  // BT-4 汇总所有班级打卡率（跟随作业打卡页月份 state.attMonth）—— 使用通用统计表格模板
+  // BT-4 汇总所有班级打卡率 —— 并排展示【本周全部班级打卡率】与【当月(本月)全部班级打卡率】
+  const weekAgg=allClassHwWeekAgg();
   const agg=allClassHwMonthAgg();
-  const aggRows=agg.rows.map(r=>({name:r.cls.name,expected:r.expected,done:r.done,rate:r.rate}));
-  const aggTotal=agg.rows.length?{name:'全部班级汇总',expected:agg.totalExpected,done:agg.totalDone,rate:agg.totalRate}:null;
-  const aggTable=rateTable(['班级','应提交','已交','打卡率'],aggRows,aggTotal,{empty:'本月还没有班级设置上课星期'});
-  const aggCard=statCard(`${state.attMonth+1}月 · 全部班级打卡率`,
-    agg.rows.length?`${agg.rows.length} 个班 · 应交 ${agg.totalExpected} · 已交 ${agg.totalDone} · 打卡率 ${agg.totalRate}%`:'暂无数据',
-    aggTable,
-    `<button class="btn sm" onclick="exportAllClassHwRate()">导出</button>`);
+  const weekSub=weekAgg.rows.length?`${weekAgg.weekStart} ~ ${weekAgg.weekEnd} · ${weekAgg.rows.length} 个班 · 应交 ${weekAgg.totalExpected} · 已交 ${weekAgg.totalDone} · 打卡率 ${weekAgg.totalRate}%`:'暂无数据';
+  const monthSub=agg.rows.length?`${agg.rows.length} 个班 · 应交 ${agg.totalExpected} · 已交 ${agg.totalDone} · 打卡率 ${agg.totalRate}%`:'暂无数据';
+  const aggCard=`<div class="kq-two-col hw-rate-two">
+      ${allClassHwRateCard(weekAgg,'<span class="kq-grp-dot day" style="display:inline-block;margin-right:6px;vertical-align:middle"></span>本周全部班级打卡率',weekSub,'exportAllClassHwRateWeek()')}
+      ${allClassHwRateCard(agg,`<span class="kq-grp-dot mon" style="display:inline-block;margin-right:6px;vertical-align:middle"></span>${state.attMonth+1}月全部班级打卡率`,monthSub,'exportAllClassHwRate()')}
+    </div>`;
   // BT-5 未交作业名单（点班级 → 看具体谁哪天没交）
   const miss=missHwByClass();
   const missTotal=miss.reduce((a,g)=>a+g.rows.reduce((b,x)=>b+x.miss,0),0);
