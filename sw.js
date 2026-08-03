@@ -1,6 +1,6 @@
 /* 教师教学工作台 · Service Worker
    策略：静态壳层缓存优先（离线可打开），/api 请求一律走网络（不缓存业务数据） */
-const CACHE = 'twb-shell-v54';
+const CACHE = 'twb-shell-v55';
 const SHELL = [
   './',
   './index.html',
