@@ -1135,11 +1135,11 @@ const BOTTOM=[
 const TITLES={home:'教师教学工作台',exams:'成绩记录',attendance:'作业打卡',kaoqin:'考勤管理',
   feedback:'上课反馈',remark:'学情评语',classmanage:'班级管理',students:'学生管理',
   archive:'档案 & 数据导入',points:'积分奖惩',ai:'AI文案生成',knowledge:'知识详情',schedule:'日程安排'};
-const APP_VER='v59 · 2026-08-03';
+const APP_VER='v60 · 2026-08-06';
 function renderSidebar(){
   const badgeOf=id=>id==='kaoqin'?kqUnmarkedPast():0;
   $('#sidebar').innerHTML=NAV.map((g,gi)=>`<div class="nav-title">${g.group}</div>`+
-    g.items.map((it,i)=>{const b=badgeOf(it.id);return `<button class="nav-item ${state.currentPage===it.id?'active':''}" onclick="${it.id==='kaoqin'?'goKaoqin()':`navigate('${it.id}')`}">
+    g.items.map((it,i)=>{const b=badgeOf(it.id);return `<button class="nav-item ${state.currentPage===it.id?'active':''}" onclick="${it.id==='kaoqin'?'goKaoqin()':it.id==='attendance'?'goAttendance()':`navigate('${it.id}')`}">
         <span class="nav-no">${String(gi*10+i+1).padStart(2,'0')}</span>
         <span class="nav-label">${esc(it.label)}</span>
         ${b?`<span onclick="kqPatchFirst();event.stopPropagation()" title="一键补登（不跳转）" style="margin-left:auto;min-width:16px;height:16px;background:var(--danger);color:#fff;border-radius:9px;font-size:10px;line-height:16px;text-align:center;padding:0 4px;cursor:pointer">${b}</span>`:''}
@@ -1261,6 +1261,7 @@ function pendingHwClasses(today){
   return state.classes.filter(c=>isSchoolDay(c,today)&&!(state.attLocked&&state.attLocked[attLockKey(c.id,today)]));
 }
 function attGoto(clsId,date){state.curClassId=clsId;state.attDate=date;save();navigate('attendance');}
+function goAttendance(){state.attDate=todayStr();state.attMonth=(new Date()).getMonth();save();navigate('attendance');}
 function todoBoard(){
   const today=todayStr();
   const pa=pendingAttClasses(today), ph=pendingHwClasses(today);
@@ -2032,7 +2033,7 @@ function kqUnmarkedPast(){
 function kqUnmarkedPastCls(cls){const t=todayStr();let n=0;classDueDates(cls).forEach(d=>{if(d<t&&!state.attendance[kqKey(cls.id,d)])n++;});return n;}
 /* 最早的遗漏考勤日（用于红点直达） */
 function kqFirstUnmarkedDate(){const t=todayStr();let best=null;state.classes.forEach(c=>{classDueDates(c).forEach(d=>{if(d<t&&!state.attendance[kqKey(c.id,d)]&&(!best||d<best))best=d;});});return best;}
-function goKaoqin(){const d=kqFirstUnmarkedDate();if(d)state.kqDate=d;save();navigate('kaoqin');}
+function goKaoqin(){state.kqDate=todayStr();save();navigate('kaoqin');}
 /* 一键补登：定位到最早的遗漏日，按到课登记全班（可再微调） */
 function kqPatchFirst(){const d=kqFirstUnmarkedDate();if(!d){toast('没有遗漏的考勤日啦 ✓');return;}const c=state.classes.find(c=>classDueDates(c).includes(d));if(!c){toast('没有遗漏的考勤日啦 ✓');return;}const key=kqKey(c.id,d);state.attendance[key]=state.attendance[key]||{};c.students.forEach(id=>{if(!state.attendance[key][id])state.attendance[key][id]={status:'present',reason:''};});kqSyncPoints(c,d);save();render();toast('已补登 '+d+'（'+c.name+'）全班到课，可再微调 ✓');}
 /* 累计打卡统计（开课至今，自动计算，历史数据保留） */
@@ -2196,6 +2197,7 @@ function exportHwTotal(){
 }
 function viewAttendance(){
   const cls=curClass();
+  if(!state.attDate||!parseD(state.attDate)){state.attDate=todayStr();state.attMonth=(new Date()).getMonth();save();}
   const locked=attIsLocked();
   const monthName=`${state.attMonth+1}月`;
   const rows=clsStudents(cls).map(s=>{const id=s.id;const st=attStatusOf(id,state.attDate);
@@ -2634,7 +2636,7 @@ function kqStuDetailWin(cls,days){
 function viewKaoqin(){
   const cls=curClass();
   const days=classDueDates(cls);
-  if(!state.kqDate||!days.includes(state.kqDate)){state.kqDate=days.length?(days.filter(d=>d<=todayStr()).pop()||days[0]):todayStr();save();}
+  if(!state.kqDate||!parseD(state.kqDate)){state.kqDate=todayStr();save();}
   const locked=kqIsLocked();
   const cfgOk=!!(cls.startDate&&classWeekDays(cls).length);
   const upc=kqUnmarkedPastCls(cls);
